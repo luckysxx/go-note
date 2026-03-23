@@ -1,136 +1,100 @@
-# GopherPaste
+# go-note
 
-一个基于 Go + Vue 的 Pastebin 风格代码分享平台，采用前后端分离与双后端服务（`paste-service`、`user-service`）架构，支持本地开发、Docker Compose 和 Kubernetes 部署。
+go-note 是一个 Pastebin 风格的代码分享服务，已接入 [user-platform](../user-platform) 统一认证体系（SSO）。
 
-## 项目特性
+## 架构
 
-- 用户注册、登录与 JWT 鉴权
-- 代码片段创建与查询（Paste 服务）
-- 前端基于 Vue 3 + Vite + Element Plus
-- 基础设施包含 PostgreSQL、Redis
-- 可选监控与日志组件：Prometheus、Grafana、Loki、Promtail
+```
+用户 → user-platform 登录 → 获取 Token
+     → 携带 Token 访问 go-note API
+     → go-note 通过 gRPC 调用 user-platform VerifyToken 验证身份
+```
+
+- **认证**：通过 gRPC 委托给 user-platform，go-note 不持有 JWT Secret
+- **ORM**：ent（与 user-platform 一致）
+- **配置**：Viper + godotenv（YAML + 环境变量覆盖）
+- **共享模块**：`github.com/luckysxx/common`（logger、errs）
 
 ## 技术栈
 
-- 后端：Go、Gin、PostgreSQL、Redis、sqlc、JWT
-- 前端：Vue 3、TypeScript、Vite、Pinia、Vue Router、Element Plus
-- 部署：Docker Compose、Kubernetes
+- Go、Gin、ent、PostgreSQL、Redis
+- gRPC（与 user-platform 通信）
+- Viper（配置管理）
+- Vue 3 + Vite（前端）
 
-## 目录说明
+## 目录结构
 
-```text
-backend/                 Go 后端
-  common/                公共组件（配置、鉴权、数据库、日志等）
-  services/paste/        Paste 服务（默认 8080）
-  services/user/         User 服务（默认 8081）
-
-frontend/                Vue 前端（本地 dev 默认 5173）
-k8s/                     Kubernetes 部署清单
-docker-compose*.yaml     Compose 运行文件
-RUNNING.md               详细运行说明
-Makefile                 常用开发命令
+```
+go-note/
+├── cmd/http/main.go              # 入口（initInfra → buildRouter → runServer）
+├── configs/config.yaml           # Viper 配置
+├── internal/
+│   ├── auth/client.go            # gRPC 认证客户端 → user-platform
+│   ├── cache/redis.go
+│   ├── dberr/dberr.go
+│   ├── ent/schema/paste.go       # Ent Schema
+│   ├── platform/{config,database}
+│   ├── repository/paste_repo.go
+│   ├── service/{contract,paste.go}
+│   └── transport/http/{dto,handler,router,middleware,response,errs,validator}
+├── view/
+├── k8s/
+├── docker-compose.yaml
+└── Makefile
 ```
 
-## 环境要求
+## 快速开始
 
-- Go `1.25+`
-- Node.js `20.19+`（或 `22.12+`）
-- pnpm
-- Docker / Docker Compose（用于基础设施或容器化运行）
+### 前置条件
 
-## 快速开始（推荐）
+- Go 1.25+
+- PostgreSQL、Redis（可通过根目录 docker-compose 启动基础设施）
+- user-platform gRPC 服务运行在 `localhost:9091`
 
-在项目根目录执行：
+### 配置
 
 ```bash
-make dev
+cp .env.example .env
+# 编辑 .env，设置 DATABASE_SOURCE 和 REDIS_PASSWORD
 ```
 
-该命令会：
-
-1. 启动本地基础设施（PostgreSQL、Redis）
-2. 启动 `paste-service`（8080）
-3. 启动 `user-service`（8081）
-4. 启动前端开发服务器（Vite）
-
-首次启动前建议先初始化数据库：
+### 运行
 
 ```bash
-make db-init
+# 直接运行
+make run
+
+# 或编译后运行
+make build
+./bin/go-note
 ```
 
-## 运行方式
-
-### 1) 本地开发（Go 直接运行）
+### 常用命令
 
 ```bash
-# 启动基础设施
-make dev-infra
-
-# 初始化数据库（首次）
-make db-init
-
-# 分别启动服务（多终端）
-cd backend/services/paste && go run main.go
-cd backend/services/user && SERVER_PORT=8081 go run main.go
-cd frontend && pnpm install && pnpm dev
+make help           # 查看全部命令
+make run            # 启动服务
+make build          # 编译二进制
+make test           # 运行测试
+make ent-generate   # 重新生成 Ent 代码
+make lint           # 代码检查
 ```
 
-### 2) Docker Compose
+## API 端点
 
-```bash
-# 先启动基础设施
-docker compose -f docker-compose-infra.yaml up -d
+所有接口需携带 user-platform 签发的 Bearer Token：
 
-# 首次初始化数据库
-make db-init
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/health` | 健康检查 |
+| POST | `/api/v1/pastes` | 创建代码片段 |
+| GET | `/api/v1/pastes/:id` | 获取代码片段 |
+| PUT | `/api/v1/pastes/:id` | 更新代码片段 |
+| GET | `/api/v1/me/pastes` | 获取我的代码片段列表 |
 
-# 启动应用服务
-docker compose -f docker-compose.local.yaml up -d
-```
+## 服务端口
 
-访问地址：
-
-- 前端：http://localhost:80
-- Paste 服务：http://localhost:8080
-- User 服务：http://localhost:8081
-
-### 3) Kubernetes
-
-参考 `k8s/` 下清单按顺序部署：
-
-```bash
-kubectl apply -f k8s/namespace.yaml
-kubectl apply -f k8s/secret.yaml
-kubectl apply -f k8s/configmap.yaml
-kubectl apply -f k8s/redis.yaml
-kubectl apply -f k8s/paste-service.yaml
-```
-
-## 常用命令
-
-```bash
-make help             # 查看全部命令
-make db-init          # 初始化 users/pastes 表
-make db-migrate-paste # 执行 paste 表迁移
-make swagger-paste    # 生成 paste 服务 Swagger
-make lint             # 后端测试 + 前端 lint
-make stop-infra       # 停止 postgres/redis
-```
-
-## 服务与端口
-
-- `paste-service`: `8080`
-- `user-service`: `8081`
-- `frontend-service`: `80`（容器模式）
-- `postgres`: `5432`
-- `redis`: `6379`
-- `prometheus`: `9090`
-- `grafana`: `3000`
-- `loki`: `3100`
-
-## 额外说明
-
-- 更完整的运行与排障文档见 `RUNNING.md`
-- `pg_data/`、`redis_data/` 是本地持久化目录，建议仅用于开发环境
-- 若前端请求失败，优先检查前端代理配置（`frontend/vite.config.ts` 与 `frontend/nginx.conf`）
+| 服务 | 端口 |
+|------|------|
+| go-note HTTP | 8080 |
+| user-platform gRPC | 9091 |

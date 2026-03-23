@@ -1,61 +1,67 @@
 SHELL := /bin/bash
 
-BACKEND_DIR := backend
-FRONTEND_DIR := frontend
-SWAG_CMD := go run github.com/swaggo/swag/cmd/swag@latest
-
-.PHONY: help swagger swagger-paste db-init db-migrate-paste dev dev-infra stop-infra lint lint-backend lint-frontend
+.PHONY: help run build test lint ent-generate docker-up docker-down docker-build clean
 
 help:
 	@echo "Available targets:"
-	@echo "  make swagger        	# Generate Swagger docs (paste service)"
-	@echo "  make swagger-paste  	# Generate Swagger docs for paste service"
-	@echo "  make db-init        	# Initialize users/pastes tables in postgres"
-	@echo "  make db-migrate-paste 	# Run paste schema migration script"
-	@echo "  make dev            	# Start infra + run paste/user/frontend locally"
-	@echo "  make dev-infra      	# Start local postgres and redis via compose"
-	@echo "  make stop-infra     	# Stop local postgres and redis"
-	@echo "  make lint           	# Run backend test checks and frontend lint"
-	@echo "  make lint-backend   	# Run go test ./..."
-	@echo "  make lint-frontend  	# Run pnpm lint"
+	@echo "  make run              # 启动 go-note HTTP 服务"
+	@echo "  make build            # 编译二进制"
+	@echo "  make test             # 运行所有测试"
+	@echo "  make ent-generate     # 重新生成 Ent 代码"
+	@echo "  make lint             # Go vet + build 检查"
+	@echo "  make docker-up        # Docker Compose 启动"
+	@echo "  make docker-down      # Docker Compose 停止"
+	@echo "  make docker-build     # Docker Compose 构建并启动"
+	@echo "  make clean            # 清理编译产物"
 
-swagger: swagger-paste
+# ==========================================
+# 开发
+# ==========================================
 
-swagger-paste:
-	@cd $(BACKEND_DIR) && $(SWAG_CMD) init -g main.go -d services/paste -o services/paste/docs
-	@echo "Swagger docs generated at backend/services/paste/docs"
+run:
+	@go run ./cmd/http/main.go
 
-db-init:
-	@docker exec -i gopher_db psql -U luckys -d gopher_paste < $(BACKEND_DIR)/services/user/db/schema.sql
-	@docker exec -i gopher_db psql -U luckys -d gopher_paste < $(BACKEND_DIR)/services/paste/db/schema.sql
-	@echo "Database initialized: users, pastes"
+build:
+	@go build -o bin/go-note ./cmd/http/main.go
+	@echo "Binary built: bin/go-note"
 
-db-migrate-paste:
-	@docker exec -i gopher_db psql -U luckys -d gopher_paste < $(BACKEND_DIR)/services/paste/db/migrations/001_upgrade_pastes_to_snippets.sql
-	@docker exec -i gopher_db psql -U luckys -d gopher_paste -c "SELECT column_name, data_type FROM information_schema.columns WHERE table_name='pastes' ORDER BY ordinal_position;"
-	@echo "Paste migration applied and verified"
+test:
+	@go test ./internal/...
 
-dev-infra:
-	@docker network inspect gopher-net >/dev/null 2>&1 || docker network create gopher-net
-	@docker compose -f docker-compose-infra.yaml up -d postgres redis
-	@echo "Infra is running: postgres(5432), redis(6379)"
+lint:
+	@go vet ./...
+	@go build ./...
+	@echo "Lint passed"
 
-stop-infra:
-	@docker compose -f docker-compose-infra.yaml stop postgres redis
-	@echo "Infra stopped"
+# ==========================================
+# 代码生成
+# ==========================================
 
-dev: dev-infra
-	@set -euo pipefail; \
-	trap 'kill 0' INT TERM EXIT; \
-	(cd $(BACKEND_DIR)/services/paste && go run main.go) & \
-	(cd $(BACKEND_DIR)/services/user && SERVER_PORT=8081 go run main.go) & \
-	(cd $(FRONTEND_DIR) && pnpm dev) & \
-	wait
+ent-generate:
+	@GOWORK=off go run -mod=mod entgo.io/ent/cmd/ent generate ./internal/ent/schema
+	@echo "Ent code generated"
 
-lint: lint-backend lint-frontend
+# ==========================================
+# Docker
+# ==========================================
 
-lint-backend:
-	@cd $(BACKEND_DIR) && go test ./...
+docker-up:
+	@docker compose up -d
+	@echo "Services started"
 
-lint-frontend:
-	@cd $(FRONTEND_DIR) && pnpm lint
+docker-down:
+	@docker compose down
+	@echo "Services stopped"
+
+docker-build:
+	@docker compose up -d --build
+	@echo "Services built and started"
+
+# ==========================================
+# 清理
+# ==========================================
+
+clean:
+	@rm -rf bin/
+	@echo "Cleaned"
+

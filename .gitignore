@@ -1,31 +1,20 @@
-# 忽略数据库数据目录
-pg_data/
-redis_data/
-
-# 忽略临时文件和日志
+# 环境变量 & 敏感配置
+.env
 *.log
+app.log
+
+# OS
 .DS_Store
 
-# 忽略 IDE 配置 
+# IDE
 .idea/
 .vscode/
 
-# ==========================================
-# 忽略 Kubernetes Secret 文件（重要！）
-# ==========================================
-# 💡 Secret 包含敏感信息（密码、Token），绝对不能提交到 Git
-# 💡 只提交 secret.yaml.example 作为模板
-k8s/secret.yaml
-k8s/*-secret.yaml
-*secret*.yaml
+# Go
+tmp/
+bin/
 
-# 💡 如果你有多环境的 Secret
-k8s/secrets/
-k8s/*/secret.yaml
-
-# ==========================================
-# 忽略 Docker Registry Secret（镜像拉取凭证）
-# ==========================================
-# 💡 docker-registry-secret.yaml 包含阿里云账号密码
-# 💡 应该使用 kubectl create secret 命令创建，不要在文件中存储
-k8s/docker-registry-secret.yaml
+# Frontend
+view/node_modules/
+view/dist/
+view/.eslintcache

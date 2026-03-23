@@ -1,44 +1,38 @@
 services:
-  user-service:
-    image: crpi-owej7l76wqheszs7.cn-hangzhou.personal.cr.aliyuncs.com/luckys_devops/user_service:latest
-    ports:
-      - "8081:8080"
-    environment:
-      - ENV=production
-      - SERVER_PORT=8080
-      - DB_SOURCE=postgres://luckys:123456@gopher_db:5432/gopher_paste?sslmode=disable
-      - REDIS_ADDR=gopher_redis:6379
-      - REDIS_PASSWORD=123456
-      - JWT_SECRET=gopherpaste_secret_key
-    networks:
-      - default
-    depends_on:
-      - paste-service
-
-  paste-service:
-    image: crpi-owej7l76wqheszs7.cn-hangzhou.personal.cr.aliyuncs.com/luckys_devops/paste_service:latest
+  go-note:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: go-note
     ports:
       - "8080:8080"
     environment:
-      - ENV=production
+      - APP_ENV=development
       - SERVER_PORT=8080
-      - DB_SOURCE=postgres://luckys:123456@gopher_db:5432/gopher_paste?sslmode=disable
-      - REDIS_ADDR=gopher_redis:6379
+      - DATABASE_DRIVER=postgres
+      - DATABASE_SOURCE=postgres://luckys:123456@global-postgres:5432/go_note?sslmode=disable
+      - DATABASE_AUTO_MIGRATE=true
+      - REDIS_ADDR=global-redis:6379
       - REDIS_PASSWORD=123456
+      - USER_PLATFORM_ADDR=user-grpc:9091
     networks:
-      - default
+      - go-net
+    restart: unless-stopped
 
-  frontend-service:
-    image: crpi-owej7l76wqheszs7.cn-hangzhou.personal.cr.aliyuncs.com/luckys_devops/frontend_service:latest
+  go-note-view:
+    build:
+      context: ./view
+      dockerfile: Dockerfile
+    container_name: go-note-view
     ports:
-      - "80:80"
+      - "8082:80"
     networks:
-      - default
+      - go-net
     depends_on:
-      - user-service
-      - paste-service
+      - go-note
+    restart: unless-stopped
 
 networks:
-  default:
-    name: gopher-net
+  go-net:
+    name: go-net
     external: true
