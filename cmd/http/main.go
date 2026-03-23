@@ -13,8 +13,8 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/luckysxx/common/logger"
+	commonRedis "github.com/luckysxx/common/pkg/redis"
 	"github.com/luckysxx/go-note/internal/auth"
-	"github.com/luckysxx/go-note/internal/cache"
 	"github.com/luckysxx/go-note/internal/ent"
 	"github.com/luckysxx/go-note/internal/platform/config"
 	"github.com/luckysxx/go-note/internal/platform/database"
@@ -50,7 +50,11 @@ func main() {
 // initInfra 初始化基础设施
 func initInfra(cfg *config.Config, log *zap.Logger) (*ent.Client, *redis.Client, *auth.AuthClient) {
 	entClient := database.InitEntClient(cfg.Database, log)
-	redisClient := cache.InitRedis(cfg.Redis, log)
+	redisClient := commonRedis.Init(commonRedis.Config{
+		Addr:     cfg.Redis.Addr,
+		Password: cfg.Redis.Password,
+		DB:       cfg.Redis.DB,
+	}, log)
 
 	authClient, err := auth.NewAuthClient(cfg.UserPlatform.Addr)
 	if err != nil {
