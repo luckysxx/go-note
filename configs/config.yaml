@@ -15,3 +15,7 @@ redis:
 
 user_platform:
   addr: "localhost:9091" # user-platform gRPC 地址
+
+otel:
+  jaeger_endpoint: "localhost:4318"
+  service_name: "go-note"

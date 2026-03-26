@@ -15,6 +15,7 @@ type Config struct {
 	Database     DatabaseConfig     `mapstructure:"database"`
 	Redis        RedisConfig        `mapstructure:"redis"`
 	UserPlatform UserPlatformConfig `mapstructure:"user_platform"`
+	OTel         OTelConfig         `mapstructure:"otel"`
 }
 
 // ServerConfig HTTP 服务器配置
@@ -39,6 +40,12 @@ type RedisConfig struct {
 // UserPlatformConfig user-platform gRPC 连接配置
 type UserPlatformConfig struct {
 	Addr string `mapstructure:"addr"`
+}
+
+// OTelConfig OpenTelemetry 链路追踪配置
+type OTelConfig struct {
+	JaegerEndpoint string `mapstructure:"jaeger_endpoint"`
+	ServiceName    string `mapstructure:"service_name"`
 }
 
 // LoadConfig 从 Viper 加载配置

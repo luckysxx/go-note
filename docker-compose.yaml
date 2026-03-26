@@ -4,8 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: go-note
-    ports:
-      - "8080:8080"
+    # 不暴露端口到宿主机，只通过网关访问（网络隔离）
     environment:
       - APP_ENV=development
       - SERVER_PORT=8080
@@ -15,6 +14,8 @@ services:
       - REDIS_ADDR=global-redis:6379
       - REDIS_PASSWORD=123456
       - USER_PLATFORM_ADDR=user-grpc:9091
+      - OTEL_JAEGER_ENDPOINT=global-jaeger:4318
+      - OTEL_SERVICE_NAME=go-note
     networks:
       - go-net
     restart: unless-stopped

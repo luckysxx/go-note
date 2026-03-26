@@ -31,27 +31,25 @@
             <el-form-item label="密码">
               <el-input v-model="loginForm.password" type="password" placeholder="••••••••" show-password />
             </el-form-item>
-            <div class="form-actions">
-              <el-checkbox v-model="loginForm.remember">保持登录</el-checkbox>
-            </div>
-            <el-button type="primary" class="full" size="large" :loading="loginLoading" @click="handleLogin">
-              <el-icon>
-                <Right />
-              </el-icon>
-              <span>进入控制台</span>
+            <el-button type="primary" class="full" size="large" :loading="loginLoading" @click="handleDirectLogin">
+              <el-icon><Right /></el-icon>
+              <span>登录</span>
             </el-button>
           </el-form>
 
           <div class="divider">
-            <span>还没有账号？</span>
+            <span>或</span>
           </div>
 
+          <el-button plain class="sso-btn" size="large" @click="handleSsoLogin">
+            <el-icon><Link /></el-icon>
+            <span>前往统一身份登录（SSO）</span>
+          </el-button>
+
           <div class="register-hint">
-            <p>GoNote 使用统一账号体系，请前往 user-platform 注册</p>
+            <p>还没有账号？</p>
             <el-button plain class="register-btn" @click="goToRegister">
-              <el-icon>
-                <UserFilled />
-              </el-icon>
+              <el-icon><UserFilled /></el-icon>
               <span>前往注册</span>
             </el-button>
           </div>
@@ -65,9 +63,10 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Right, UserFilled } from '@element-plus/icons-vue'
-import { login } from '@/api/user'
+import { Right, UserFilled, Link } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
+import { buildSsoLoginUrl } from '@/router'
+import request from '@/utils/request'
 
 const router = useRouter()
 const route = useRoute()
@@ -77,48 +76,67 @@ const loginLoading = ref(false)
 const loginForm = reactive({
   account: '',
   password: '',
-  remember: true,
 })
 
 // user-platform 统一注册页面地址
 const USER_PLATFORM_URL = import.meta.env.VITE_USER_PLATFORM_URL || 'http://localhost:5173'
 
-const goToRegister = () => {
-  window.open(`${USER_PLATFORM_URL}/register`, '_blank')
-}
-
-const getErrorMessage = (error: unknown, fallback: string) => {
-  if (error instanceof Error && error.message) return error.message
-  return fallback
-}
-
-const handleLogin = async () => {
+// ========== 方式一：直接在 go-note 输入账号密码 ==========
+const handleDirectLogin = async () => {
   if (!loginForm.account || !loginForm.password) {
     ElMessage.warning('请填写完整的登录信息')
     return
   }
 
+  // 生成设备指纹
+  let deviceId = localStorage.getItem('device_id')
+  if (!deviceId) {
+    deviceId = crypto.randomUUID()
+    localStorage.setItem('device_id', deviceId)
+  }
+
   loginLoading.value = true
   try {
-    const res = await login({
+    // 通过网关直接调 user-platform 的 login API
+    const res = await request.post<unknown, {
+      access_token?: string
+      token?: string
+      refresh_token?: string
+      user_id: number
+      username: string
+    }>('/api/v1/users/login', {
       username: loginForm.account,
       password: loginForm.password,
+      app_code: 'go-note',
+      device_id: deviceId,
     })
 
-    authStore.setAuth(res.token, res.refresh_token, {
+    const token = res.access_token ?? res.token ?? ''
+    authStore.setAuth(token, res.refresh_token ?? '', {
       id: res.user_id,
       username: res.username,
-      email: res.email,
+      email: '',
     })
 
     ElMessage.success('登录成功！')
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
     router.push(redirect)
   } catch (error: unknown) {
-    ElMessage.error(getErrorMessage(error, '登录失败，请检查用户名和密码'))
+    const msg = error instanceof Error ? error.message : '登录失败，请检查用户名和密码'
+    ElMessage.error(msg)
   } finally {
     loginLoading.value = false
   }
+}
+
+// ========== 方式二：跳转 SSO 统一登录 ==========
+const handleSsoLogin = () => {
+  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
+  window.location.href = buildSsoLoginUrl(redirect)
+}
+
+const goToRegister = () => {
+  window.open(`${USER_PLATFORM_URL}/register?app_code=go-note`, '_blank')
 }
 
 onMounted(() => {
@@ -269,19 +287,24 @@ onMounted(() => {
     gap: 6px;
   }
 
-  .form-actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin: 6px 0 16px;
-  }
-
   .full {
     width: 100%;
     border-radius: 10px;
     font-weight: 700;
     background: linear-gradient(135deg, var(--accent), #7c3aed);
     border: none;
+  }
+}
+
+.sso-btn {
+  width: 100%;
+  border-radius: 10px;
+  font-weight: 600;
+  color: var(--accent);
+  border-color: var(--accent) !important;
+
+  &:hover {
+    background: var(--accent-glow) !important;
   }
 }
 
@@ -305,7 +328,7 @@ onMounted(() => {
   text-align: center;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
 
   p {

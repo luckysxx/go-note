@@ -2,6 +2,7 @@ import axios from 'axios'
 import type { AxiosResponse } from 'axios'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+import { buildSsoLoginUrl } from '@/router'
 
 // 1. 创建 axios 实例
 const service = axios.create({
@@ -63,7 +64,7 @@ service.interceptors.response.use(
       
       if (!authStore.refreshToken) {
         authStore.logout()
-        if (window.location.pathname !== '/auth') window.location.href = '/auth'
+        window.location.href = buildSsoLoginUrl(window.location.pathname)
         return Promise.reject(error)
       }
 
@@ -71,16 +72,16 @@ service.interceptors.response.use(
         isRefreshing = true
         
         // 使用独立的基础 axios 实例重试刷新，避免循环依赖和重复拦截
-        return axios.post('/api/v1/users/refresh', { refresh_token: authStore.refreshToken })
+        return axios.post('/api/v1/users/refresh', { token: authStore.refreshToken })
           .then(res => {
             const data = res.data.data
-            authStore.updateTokens(data.token, data.refresh_token)
+            authStore.updateTokens(data.access_token ?? data.token, data.refresh_token)
             
             // 修正原请求的 header
-            originalRequest.headers.Authorization = `Bearer ${data.token}`
+            originalRequest.headers.Authorization = `Bearer ${data.access_token ?? data.token}`
             
             // 执行队列中等待的所有请求
-            requestsQueue.forEach(cb => cb(data.token))
+            requestsQueue.forEach(cb => cb(data.access_token ?? data.token))
             requestsQueue = []
             
             // 继续重新发送当前失败的请求
@@ -90,7 +91,7 @@ service.interceptors.response.use(
             // 刷新也失败了，说明 refresh_token 过期或无效
             authStore.logout()
             ElMessage.error('登录状态已过期，请重新登录')
-            if (window.location.pathname !== '/auth') window.location.href = '/auth'
+            window.location.href = buildSsoLoginUrl(window.location.pathname)
             return Promise.reject(refreshErr)
           })
           .finally(() => {

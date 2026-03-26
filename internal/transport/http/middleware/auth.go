@@ -2,41 +2,31 @@ package middleware
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
-
-	"github.com/luckysxx/go-note/internal/auth"
 )
 
-// JWTAuth 鉴权中间件：通过 gRPC 调用 user-platform 验证 Token
-func JWTAuth(authClient *auth.AuthClient, logger *zap.Logger) gin.HandlerFunc {
+// GatewayAuth 信任网关鉴权中间件
+// 网关已完成 JWT 校验，并将 user_id 注入 X-User-Id Header
+// 微服务只需读取 Header，不再重复调用 gRPC 验证 Token
+func GatewayAuth(logger *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 1. 提取 Bearer Token
-		token, err := auth.ExtractBearerToken(c.GetHeader("Authorization"))
-		if err != nil {
-			logger.Debug("请求鉴权拦截", zap.Error(err), zap.String("client_ip", c.ClientIP()))
+		userIDStr := c.GetHeader("X-User-Id")
+		if userIDStr == "" {
+			logger.Warn("非法内部直连请求，缺失网关身份标识", zap.String("client_ip", c.ClientIP()))
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"code": 401,
-				"msg":  "无效的访问凭证或已过期，请重新登录",
+				"msg":  "非法请求，已被微服务内网隔离",
 			})
 			return
 		}
 
-		// 2. 调用 user-platform gRPC 验证 Token
-		result, err := authClient.VerifyToken(c.Request.Context(), token)
-		if err != nil {
-			logger.Debug("Token 验证失败", zap.Error(err), zap.String("client_ip", c.ClientIP()))
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"code": 401,
-				"msg":  "无效的访问凭证或已过期，请重新登录",
-			})
-			return
-		}
+		userID, _ := strconv.ParseInt(userIDStr, 10, 64)
 
-		// 3. 将用户信息挂载到 Gin Context
-		c.Set("userID", result.UserID)
-		c.Set("username", result.Username)
+		// 将网关传来的 userID 挂载到 Context，业务 Handler 通过 GetUserID 读取
+		c.Set("userID", userID)
 
 		c.Next()
 	}

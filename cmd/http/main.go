@@ -13,8 +13,8 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/luckysxx/common/logger"
-	commonRedis "github.com/luckysxx/common/pkg/redis"
-	"github.com/luckysxx/go-note/internal/auth"
+	commonOtel "github.com/luckysxx/common/otel"
+	commonRedis "github.com/luckysxx/common/redis"
 	"github.com/luckysxx/go-note/internal/ent"
 	"github.com/luckysxx/go-note/internal/platform/config"
 	"github.com/luckysxx/go-note/internal/platform/database"
@@ -35,20 +35,26 @@ func main() {
 	cfg := config.LoadConfig()
 
 	// 1. 初始化底层基础设施
-	entClient, redisClient, authClient := initInfra(cfg, log)
+	entClient, redisClient := initInfra(cfg, log)
 	defer entClient.Close()
 	defer redisClient.Close()
-	defer authClient.Close()
 
-	// 2. 依赖注入与组件装配
-	router := buildRouter(cfg, entClient, redisClient, authClient, log)
+	// 2. 初始化 OpenTelemetry 链路追踪
+	otelShutdown, err := commonOtel.InitTracer(cfg.OTel.ServiceName, cfg.OTel.JaegerEndpoint)
+	if err != nil {
+		log.Fatal("初始化 OpenTelemetry 失败", zap.Error(err))
+	}
+	defer otelShutdown(context.Background())
 
-	// 3. 阻塞运行与优雅停机
+	// 3. 依赖注入与组件装配
+	router := buildRouter(cfg, entClient, redisClient, log)
+
+	// 4. 阻塞运行与优雅停机
 	runServer(router, cfg.Server.Port, log)
 }
 
 // initInfra 初始化基础设施
-func initInfra(cfg *config.Config, log *zap.Logger) (*ent.Client, *redis.Client, *auth.AuthClient) {
+func initInfra(cfg *config.Config, log *zap.Logger) (*ent.Client, *redis.Client) {
 	entClient := database.InitEntClient(cfg.Database, log)
 	redisClient := commonRedis.Init(commonRedis.Config{
 		Addr:     cfg.Redis.Addr,
@@ -56,17 +62,11 @@ func initInfra(cfg *config.Config, log *zap.Logger) (*ent.Client, *redis.Client,
 		DB:       cfg.Redis.DB,
 	}, log)
 
-	authClient, err := auth.NewAuthClient(cfg.UserPlatform.Addr)
-	if err != nil {
-		log.Fatal("初始化 user-platform 认证客户端失败", zap.Error(err))
-	}
-	log.Info("已连接 user-platform gRPC", zap.String("addr", cfg.UserPlatform.Addr))
-
-	return entClient, redisClient, authClient
+	return entClient, redisClient
 }
 
 // buildRouter 依赖注入装配
-func buildRouter(cfg *config.Config, entClient *ent.Client, redisClient *redis.Client, authClient *auth.AuthClient, log *zap.Logger) *gin.Engine {
+func buildRouter(cfg *config.Config, entClient *ent.Client, redisClient *redis.Client, log *zap.Logger) *gin.Engine {
 	// Repository
 	pasteRepo := repository.NewPasteRepository(entClient)
 
@@ -75,9 +75,8 @@ func buildRouter(cfg *config.Config, entClient *ent.Client, redisClient *redis.C
 
 	// Transport
 	pasteHandler := handler.NewPasteHandler(pasteSvc, log)
-	authHandler := handler.NewAuthHandler(authClient, log)
 	r := gin.New()
-	httprouter.SetupRouter(r, pasteHandler, authHandler, authClient, log)
+	httprouter.SetupRouter(r, pasteHandler, log)
 
 	return r
 }

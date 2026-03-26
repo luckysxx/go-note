@@ -2,6 +2,9 @@ import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import { useAuthStore } from '@/stores/auth'
 
+// user-platform SSO 登录页地址
+const SSO_LOGIN_URL = import.meta.env.VITE_SSO_LOGIN_URL || 'http://localhost:5173/login'
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -16,6 +19,11 @@ const router = createRouter({
       name: 'auth',
       component: () => import('../views/AuthView.vue'),
       meta: { guestOnly: true },
+    },
+    {
+      path: '/auth/callback',
+      name: 'sso-callback',
+      component: () => import('../views/SsoCallbackView.vue'),
     },
     {
       path: '/snippets/new',
@@ -42,13 +50,26 @@ const router = createRouter({
     {
       path: '/about',
       name: 'about',
-      // route level code-splitting
-      // this generates a separate chunk (About.[hash].js) for this route
-      // which is lazy-loaded when the route is visited.
       component: () => import('../views/AboutView.vue'),
     },
   ],
 })
+
+/**
+ * 构建 SSO 登录跳转 URL
+ * 携带 app_code 和 redirect_uri，登录成功后 user-platform 会带 token 跳回 callback
+ */
+function buildSsoLoginUrl(redirectAfterLogin: string): string {
+  const callbackUrl = new URL('/auth/callback', window.location.origin)
+  // 把用户原始目标页面存到 state 参数，callback 页面会用它做最终跳转
+  callbackUrl.searchParams.set('state', redirectAfterLogin)
+
+  const ssoUrl = new URL(SSO_LOGIN_URL)
+  ssoUrl.searchParams.set('app_code', 'go-note')
+  ssoUrl.searchParams.set('redirect_uri', callbackUrl.toString())
+
+  return ssoUrl.toString()
+}
 
 router.beforeEach((to) => {
   const authStore = useAuthStore()
@@ -57,6 +78,7 @@ router.beforeEach((to) => {
   }
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+    // 未登录 → 跳转 go-note 登录入口页，由用户主动点击跳 SSO
     return { path: '/auth', query: { redirect: to.fullPath } }
   }
 
@@ -67,4 +89,5 @@ router.beforeEach((to) => {
   return true
 })
 
+export { buildSsoLoginUrl }
 export default router

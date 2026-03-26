@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	authpb "github.com/luckysxx/common/proto/auth"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -38,7 +39,10 @@ type RefreshTokenResult struct {
 
 // NewAuthClient 创建 gRPC 认证客户端
 func NewAuthClient(addr string) (*AuthClient, error) {
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()), // OTel: 自动把 SpanContext 传给 user-platform gRPC
+	)
 	if err != nil {
 		return nil, fmt.Errorf("连接 user-platform gRPC 失败: %w", err)
 	}

@@ -16,7 +16,7 @@ export default defineConfig({
     port: 5174,
     proxy: {
       '/api/v1': {
-        target: 'http://localhost:8080',
+        target: 'http://localhost:8000', // 统一走 API 网关
         changeOrigin: true,
       },
     },
