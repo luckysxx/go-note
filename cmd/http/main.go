@@ -12,6 +12,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/luckysxx/common/health"
 	"github.com/luckysxx/common/logger"
 	commonOtel "github.com/luckysxx/common/otel"
 	commonRedis "github.com/luckysxx/common/redis"
@@ -76,6 +77,19 @@ func buildRouter(cfg *config.Config, entClient *ent.Client, redisClient *redis.C
 	// Transport
 	pasteHandler := handler.NewPasteHandler(pasteSvc, log)
 	r := gin.New()
+
+	// 健康检查（注册在业务中间件之前）
+	healthChecker := health.NewChecker()
+	healthChecker.AddCheck("postgres", func(ctx context.Context) error {
+		// 通过 Ent 执行一条轻量查询来验证数据库连接
+		var v []int
+		return entClient.Paste.Query().Limit(0).Select().Scan(ctx, &v)
+	})
+	healthChecker.AddCheck("redis", func(ctx context.Context) error {
+		return redisClient.Ping(ctx).Err()
+	})
+	healthChecker.Register(r)
+
 	httprouter.SetupRouter(r, pasteHandler, log)
 
 	return r

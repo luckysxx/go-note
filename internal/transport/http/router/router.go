@@ -19,13 +19,6 @@ func SetupRouter(r *gin.Engine, pasteHandler *handler.PasteHandler, log *zap.Log
 	r.Use(logger.GinLogger(log))
 	r.Use(logger.GinRecovery(log, true))
 
-	// 健康检查
-	healthHandler := func(c *gin.Context) {
-		c.String(200, "ok")
-	}
-	r.GET("/health", healthHandler)
-	r.HEAD("/health", healthHandler)
-
 	v1 := r.Group("/api/v1")
 	{
 		// 需要鉴权的接口（信任网关传来的 X-User-Id）
