@@ -22,6 +22,7 @@ require (
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/luckysxx/common/trace v0.1.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/prometheus/client_golang v1.23.2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
@@ -61,7 +62,7 @@ require (
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/luckysxx/common/errs v0.1.0
-	github.com/luckysxx/common/logger v0.1.0
+	github.com/luckysxx/common/logger v0.2.0
 	github.com/luckysxx/common/otel v0.1.0
 	github.com/luckysxx/common/redis v0.1.0
 	github.com/mattn/go-isatty v0.0.20 // indirect
