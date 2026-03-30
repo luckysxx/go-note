@@ -2,17 +2,16 @@
 # Build stage
 FROM golang:1.25-alpine AS builder
 
-WORKDIR /build
+WORKDIR /app
 
 ENV GOPROXY=https://goproxy.cn,direct
 
-# 拷贝 go.mod/go.sum 先缓存依赖
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
-# 拷贝源码并编译
 COPY . .
+
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=linux go build -o go-note ./cmd/http/main.go
@@ -24,8 +23,8 @@ RUN apk --no-cache add ca-certificates tzdata
 ENV TZ=Asia/Shanghai
 
 WORKDIR /app
-COPY --from=builder /build/go-note .
-COPY --from=builder /build/configs ./configs
+COPY --from=builder /app/go-note .
+COPY --from=builder /app/configs ./configs
 
 EXPOSE 8080
 

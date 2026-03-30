@@ -56,7 +56,7 @@ func main() {
 
 // initInfra 初始化基础设施
 func initInfra(cfg *config.Config, log *zap.Logger) (*ent.Client, *redis.Client) {
-	entClient := database.InitEntClient(cfg.Database, log)
+	entClient := database.InitEntClient(cfg.Database.Driver, cfg.Database.Source, cfg.Database.AutoMigrate, log)
 	redisClient := commonRedis.Init(commonRedis.Config{
 		Addr:     cfg.Redis.Addr,
 		Password: cfg.Redis.Password,

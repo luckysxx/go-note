@@ -20,19 +20,6 @@ services:
       - go-net
     restart: unless-stopped
 
-  go-note-view:
-    build:
-      context: ./view
-      dockerfile: Dockerfile
-    container_name: go-note-view
-    ports:
-      - "8082:80"
-    networks:
-      - go-net
-    depends_on:
-      - go-note
-    restart: unless-stopped
-
 networks:
   go-net:
     name: go-net
