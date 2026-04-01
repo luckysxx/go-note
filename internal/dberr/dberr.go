@@ -17,8 +17,6 @@ var (
 	ErrInvalidData      = errors.New("数据格式错误")
 	ErrConnection       = errors.New("数据库连接失败")
 
-	// Paste 相关错误
-	ErrShortLinkDuplicate = errors.New("短链接已存在")
 )
 
 // PostgreSQL 错误代码
@@ -61,9 +59,6 @@ func ParseDBError(err error) error {
 func parsePgError(pqErr *pq.Error) error {
 	switch pqErr.Code {
 	case PgErrUniqueViolation:
-		if pqErr.Constraint == "pastes_short_link_key" {
-			return ErrShortLinkDuplicate
-		}
 		return ErrDuplicateKey
 
 	case PgErrForeignKeyViolation:

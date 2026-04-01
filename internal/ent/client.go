@@ -14,7 +14,10 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
-	"github.com/luckysxx/go-note/internal/ent/paste"
+	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/luckysxx/go-note/internal/ent/group"
+	"github.com/luckysxx/go-note/internal/ent/snippet"
+	"github.com/luckysxx/go-note/internal/ent/tag"
 )
 
 // Client is the client that holds all ent builders.
@@ -22,8 +25,12 @@ type Client struct {
 	config
 	// Schema is the client for creating, migrating and dropping schema.
 	Schema *migrate.Schema
-	// Paste is the client for interacting with the Paste builders.
-	Paste *PasteClient
+	// Group is the client for interacting with the Group builders.
+	Group *GroupClient
+	// Snippet is the client for interacting with the Snippet builders.
+	Snippet *SnippetClient
+	// Tag is the client for interacting with the Tag builders.
+	Tag *TagClient
 }
 
 // NewClient creates a new client configured with the given options.
@@ -35,7 +42,9 @@ func NewClient(opts ...Option) *Client {
 
 func (c *Client) init() {
 	c.Schema = migrate.NewSchema(c.driver)
-	c.Paste = NewPasteClient(c.config)
+	c.Group = NewGroupClient(c.config)
+	c.Snippet = NewSnippetClient(c.config)
+	c.Tag = NewTagClient(c.config)
 }
 
 type (
@@ -126,9 +135,11 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 	cfg := c.config
 	cfg.driver = tx
 	return &Tx{
-		ctx:    ctx,
-		config: cfg,
-		Paste:  NewPasteClient(cfg),
+		ctx:     ctx,
+		config:  cfg,
+		Group:   NewGroupClient(cfg),
+		Snippet: NewSnippetClient(cfg),
+		Tag:     NewTagClient(cfg),
 	}, nil
 }
 
@@ -146,16 +157,18 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 	cfg := c.config
 	cfg.driver = &txDriver{tx: tx, drv: c.driver}
 	return &Tx{
-		ctx:    ctx,
-		config: cfg,
-		Paste:  NewPasteClient(cfg),
+		ctx:     ctx,
+		config:  cfg,
+		Group:   NewGroupClient(cfg),
+		Snippet: NewSnippetClient(cfg),
+		Tag:     NewTagClient(cfg),
 	}, nil
 }
 
 // Debug returns a new debug-client. It's used to get verbose logging on specific operations.
 //
 //	client.Debug().
-//		Paste.
+//		Group.
 //		Query().
 //		Count(ctx)
 func (c *Client) Debug() *Client {
@@ -177,126 +190,134 @@ func (c *Client) Close() error {
 // Use adds the mutation hooks to all the entity clients.
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
-	c.Paste.Use(hooks...)
+	c.Group.Use(hooks...)
+	c.Snippet.Use(hooks...)
+	c.Tag.Use(hooks...)
 }
 
 // Intercept adds the query interceptors to all the entity clients.
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
-	c.Paste.Intercept(interceptors...)
+	c.Group.Intercept(interceptors...)
+	c.Snippet.Intercept(interceptors...)
+	c.Tag.Intercept(interceptors...)
 }
 
 // Mutate implements the ent.Mutator interface.
 func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 	switch m := m.(type) {
-	case *PasteMutation:
-		return c.Paste.mutate(ctx, m)
+	case *GroupMutation:
+		return c.Group.mutate(ctx, m)
+	case *SnippetMutation:
+		return c.Snippet.mutate(ctx, m)
+	case *TagMutation:
+		return c.Tag.mutate(ctx, m)
 	default:
 		return nil, fmt.Errorf("ent: unknown mutation type %T", m)
 	}
 }
 
-// PasteClient is a client for the Paste schema.
-type PasteClient struct {
+// GroupClient is a client for the Group schema.
+type GroupClient struct {
 	config
 }
 
-// NewPasteClient returns a client for the Paste from the given config.
-func NewPasteClient(c config) *PasteClient {
-	return &PasteClient{config: c}
+// NewGroupClient returns a client for the Group from the given config.
+func NewGroupClient(c config) *GroupClient {
+	return &GroupClient{config: c}
 }
 
 // Use adds a list of mutation hooks to the hooks stack.
-// A call to `Use(f, g, h)` equals to `paste.Hooks(f(g(h())))`.
-func (c *PasteClient) Use(hooks ...Hook) {
-	c.hooks.Paste = append(c.hooks.Paste, hooks...)
+// A call to `Use(f, g, h)` equals to `group.Hooks(f(g(h())))`.
+func (c *GroupClient) Use(hooks ...Hook) {
+	c.hooks.Group = append(c.hooks.Group, hooks...)
 }
 
 // Intercept adds a list of query interceptors to the interceptors stack.
-// A call to `Intercept(f, g, h)` equals to `paste.Intercept(f(g(h())))`.
-func (c *PasteClient) Intercept(interceptors ...Interceptor) {
-	c.inters.Paste = append(c.inters.Paste, interceptors...)
+// A call to `Intercept(f, g, h)` equals to `group.Intercept(f(g(h())))`.
+func (c *GroupClient) Intercept(interceptors ...Interceptor) {
+	c.inters.Group = append(c.inters.Group, interceptors...)
 }
 
-// Create returns a builder for creating a Paste entity.
-func (c *PasteClient) Create() *PasteCreate {
-	mutation := newPasteMutation(c.config, OpCreate)
-	return &PasteCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+// Create returns a builder for creating a Group entity.
+func (c *GroupClient) Create() *GroupCreate {
+	mutation := newGroupMutation(c.config, OpCreate)
+	return &GroupCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
 }
 
-// CreateBulk returns a builder for creating a bulk of Paste entities.
-func (c *PasteClient) CreateBulk(builders ...*PasteCreate) *PasteCreateBulk {
-	return &PasteCreateBulk{config: c.config, builders: builders}
+// CreateBulk returns a builder for creating a bulk of Group entities.
+func (c *GroupClient) CreateBulk(builders ...*GroupCreate) *GroupCreateBulk {
+	return &GroupCreateBulk{config: c.config, builders: builders}
 }
 
 // MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
 // a builder and applies setFunc on it.
-func (c *PasteClient) MapCreateBulk(slice any, setFunc func(*PasteCreate, int)) *PasteCreateBulk {
+func (c *GroupClient) MapCreateBulk(slice any, setFunc func(*GroupCreate, int)) *GroupCreateBulk {
 	rv := reflect.ValueOf(slice)
 	if rv.Kind() != reflect.Slice {
-		return &PasteCreateBulk{err: fmt.Errorf("calling to PasteClient.MapCreateBulk with wrong type %T, need slice", slice)}
+		return &GroupCreateBulk{err: fmt.Errorf("calling to GroupClient.MapCreateBulk with wrong type %T, need slice", slice)}
 	}
-	builders := make([]*PasteCreate, rv.Len())
+	builders := make([]*GroupCreate, rv.Len())
 	for i := 0; i < rv.Len(); i++ {
 		builders[i] = c.Create()
 		setFunc(builders[i], i)
 	}
-	return &PasteCreateBulk{config: c.config, builders: builders}
+	return &GroupCreateBulk{config: c.config, builders: builders}
 }
 
-// Update returns an update builder for Paste.
-func (c *PasteClient) Update() *PasteUpdate {
-	mutation := newPasteMutation(c.config, OpUpdate)
-	return &PasteUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+// Update returns an update builder for Group.
+func (c *GroupClient) Update() *GroupUpdate {
+	mutation := newGroupMutation(c.config, OpUpdate)
+	return &GroupUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
 }
 
 // UpdateOne returns an update builder for the given entity.
-func (c *PasteClient) UpdateOne(_m *Paste) *PasteUpdateOne {
-	mutation := newPasteMutation(c.config, OpUpdateOne, withPaste(_m))
-	return &PasteUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+func (c *GroupClient) UpdateOne(_m *Group) *GroupUpdateOne {
+	mutation := newGroupMutation(c.config, OpUpdateOne, withGroup(_m))
+	return &GroupUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
 }
 
 // UpdateOneID returns an update builder for the given id.
-func (c *PasteClient) UpdateOneID(id int64) *PasteUpdateOne {
-	mutation := newPasteMutation(c.config, OpUpdateOne, withPasteID(id))
-	return &PasteUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+func (c *GroupClient) UpdateOneID(id int64) *GroupUpdateOne {
+	mutation := newGroupMutation(c.config, OpUpdateOne, withGroupID(id))
+	return &GroupUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
 }
 
-// Delete returns a delete builder for Paste.
-func (c *PasteClient) Delete() *PasteDelete {
-	mutation := newPasteMutation(c.config, OpDelete)
-	return &PasteDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+// Delete returns a delete builder for Group.
+func (c *GroupClient) Delete() *GroupDelete {
+	mutation := newGroupMutation(c.config, OpDelete)
+	return &GroupDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
 }
 
 // DeleteOne returns a builder for deleting the given entity.
-func (c *PasteClient) DeleteOne(_m *Paste) *PasteDeleteOne {
+func (c *GroupClient) DeleteOne(_m *Group) *GroupDeleteOne {
 	return c.DeleteOneID(_m.ID)
 }
 
 // DeleteOneID returns a builder for deleting the given entity by its id.
-func (c *PasteClient) DeleteOneID(id int64) *PasteDeleteOne {
-	builder := c.Delete().Where(paste.ID(id))
+func (c *GroupClient) DeleteOneID(id int64) *GroupDeleteOne {
+	builder := c.Delete().Where(group.ID(id))
 	builder.mutation.id = &id
 	builder.mutation.op = OpDeleteOne
-	return &PasteDeleteOne{builder}
+	return &GroupDeleteOne{builder}
 }
 
-// Query returns a query builder for Paste.
-func (c *PasteClient) Query() *PasteQuery {
-	return &PasteQuery{
+// Query returns a query builder for Group.
+func (c *GroupClient) Query() *GroupQuery {
+	return &GroupQuery{
 		config: c.config,
-		ctx:    &QueryContext{Type: TypePaste},
+		ctx:    &QueryContext{Type: TypeGroup},
 		inters: c.Interceptors(),
 	}
 }
 
-// Get returns a Paste entity by its id.
-func (c *PasteClient) Get(ctx context.Context, id int64) (*Paste, error) {
-	return c.Query().Where(paste.ID(id)).Only(ctx)
+// Get returns a Group entity by its id.
+func (c *GroupClient) Get(ctx context.Context, id int64) (*Group, error) {
+	return c.Query().Where(group.ID(id)).Only(ctx)
 }
 
 // GetX is like Get, but panics if an error occurs.
-func (c *PasteClient) GetX(ctx context.Context, id int64) *Paste {
+func (c *GroupClient) GetX(ctx context.Context, id int64) *Group {
 	obj, err := c.Get(ctx, id)
 	if err != nil {
 		panic(err)
@@ -304,37 +325,367 @@ func (c *PasteClient) GetX(ctx context.Context, id int64) *Paste {
 	return obj
 }
 
+// QuerySnippets queries the snippets edge of a Group.
+func (c *GroupClient) QuerySnippets(_m *Group) *SnippetQuery {
+	query := (&SnippetClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(group.Table, group.FieldID, id),
+			sqlgraph.To(snippet.Table, snippet.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, group.SnippetsTable, group.SnippetsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
-func (c *PasteClient) Hooks() []Hook {
-	return c.hooks.Paste
+func (c *GroupClient) Hooks() []Hook {
+	return c.hooks.Group
 }
 
 // Interceptors returns the client interceptors.
-func (c *PasteClient) Interceptors() []Interceptor {
-	return c.inters.Paste
+func (c *GroupClient) Interceptors() []Interceptor {
+	return c.inters.Group
 }
 
-func (c *PasteClient) mutate(ctx context.Context, m *PasteMutation) (Value, error) {
+func (c *GroupClient) mutate(ctx context.Context, m *GroupMutation) (Value, error) {
 	switch m.Op() {
 	case OpCreate:
-		return (&PasteCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+		return (&GroupCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
 	case OpUpdate:
-		return (&PasteUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+		return (&GroupUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
 	case OpUpdateOne:
-		return (&PasteUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+		return (&GroupUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
 	case OpDelete, OpDeleteOne:
-		return (&PasteDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+		return (&GroupDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
-		return nil, fmt.Errorf("ent: unknown Paste mutation op: %q", m.Op())
+		return nil, fmt.Errorf("ent: unknown Group mutation op: %q", m.Op())
+	}
+}
+
+// SnippetClient is a client for the Snippet schema.
+type SnippetClient struct {
+	config
+}
+
+// NewSnippetClient returns a client for the Snippet from the given config.
+func NewSnippetClient(c config) *SnippetClient {
+	return &SnippetClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `snippet.Hooks(f(g(h())))`.
+func (c *SnippetClient) Use(hooks ...Hook) {
+	c.hooks.Snippet = append(c.hooks.Snippet, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `snippet.Intercept(f(g(h())))`.
+func (c *SnippetClient) Intercept(interceptors ...Interceptor) {
+	c.inters.Snippet = append(c.inters.Snippet, interceptors...)
+}
+
+// Create returns a builder for creating a Snippet entity.
+func (c *SnippetClient) Create() *SnippetCreate {
+	mutation := newSnippetMutation(c.config, OpCreate)
+	return &SnippetCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of Snippet entities.
+func (c *SnippetClient) CreateBulk(builders ...*SnippetCreate) *SnippetCreateBulk {
+	return &SnippetCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *SnippetClient) MapCreateBulk(slice any, setFunc func(*SnippetCreate, int)) *SnippetCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &SnippetCreateBulk{err: fmt.Errorf("calling to SnippetClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*SnippetCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &SnippetCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for Snippet.
+func (c *SnippetClient) Update() *SnippetUpdate {
+	mutation := newSnippetMutation(c.config, OpUpdate)
+	return &SnippetUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *SnippetClient) UpdateOne(_m *Snippet) *SnippetUpdateOne {
+	mutation := newSnippetMutation(c.config, OpUpdateOne, withSnippet(_m))
+	return &SnippetUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *SnippetClient) UpdateOneID(id int64) *SnippetUpdateOne {
+	mutation := newSnippetMutation(c.config, OpUpdateOne, withSnippetID(id))
+	return &SnippetUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for Snippet.
+func (c *SnippetClient) Delete() *SnippetDelete {
+	mutation := newSnippetMutation(c.config, OpDelete)
+	return &SnippetDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *SnippetClient) DeleteOne(_m *Snippet) *SnippetDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *SnippetClient) DeleteOneID(id int64) *SnippetDeleteOne {
+	builder := c.Delete().Where(snippet.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &SnippetDeleteOne{builder}
+}
+
+// Query returns a query builder for Snippet.
+func (c *SnippetClient) Query() *SnippetQuery {
+	return &SnippetQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeSnippet},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a Snippet entity by its id.
+func (c *SnippetClient) Get(ctx context.Context, id int64) (*Snippet, error) {
+	return c.Query().Where(snippet.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *SnippetClient) GetX(ctx context.Context, id int64) *Snippet {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryGroup queries the group edge of a Snippet.
+func (c *SnippetClient) QueryGroup(_m *Snippet) *GroupQuery {
+	query := (&GroupClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(snippet.Table, snippet.FieldID, id),
+			sqlgraph.To(group.Table, group.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, snippet.GroupTable, snippet.GroupColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryTags queries the tags edge of a Snippet.
+func (c *SnippetClient) QueryTags(_m *Snippet) *TagQuery {
+	query := (&TagClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(snippet.Table, snippet.FieldID, id),
+			sqlgraph.To(tag.Table, tag.FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, false, snippet.TagsTable, snippet.TagsPrimaryKey...),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *SnippetClient) Hooks() []Hook {
+	return c.hooks.Snippet
+}
+
+// Interceptors returns the client interceptors.
+func (c *SnippetClient) Interceptors() []Interceptor {
+	return c.inters.Snippet
+}
+
+func (c *SnippetClient) mutate(ctx context.Context, m *SnippetMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&SnippetCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&SnippetUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&SnippetUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&SnippetDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown Snippet mutation op: %q", m.Op())
+	}
+}
+
+// TagClient is a client for the Tag schema.
+type TagClient struct {
+	config
+}
+
+// NewTagClient returns a client for the Tag from the given config.
+func NewTagClient(c config) *TagClient {
+	return &TagClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `tag.Hooks(f(g(h())))`.
+func (c *TagClient) Use(hooks ...Hook) {
+	c.hooks.Tag = append(c.hooks.Tag, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `tag.Intercept(f(g(h())))`.
+func (c *TagClient) Intercept(interceptors ...Interceptor) {
+	c.inters.Tag = append(c.inters.Tag, interceptors...)
+}
+
+// Create returns a builder for creating a Tag entity.
+func (c *TagClient) Create() *TagCreate {
+	mutation := newTagMutation(c.config, OpCreate)
+	return &TagCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of Tag entities.
+func (c *TagClient) CreateBulk(builders ...*TagCreate) *TagCreateBulk {
+	return &TagCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *TagClient) MapCreateBulk(slice any, setFunc func(*TagCreate, int)) *TagCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &TagCreateBulk{err: fmt.Errorf("calling to TagClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*TagCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &TagCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for Tag.
+func (c *TagClient) Update() *TagUpdate {
+	mutation := newTagMutation(c.config, OpUpdate)
+	return &TagUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *TagClient) UpdateOne(_m *Tag) *TagUpdateOne {
+	mutation := newTagMutation(c.config, OpUpdateOne, withTag(_m))
+	return &TagUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *TagClient) UpdateOneID(id int64) *TagUpdateOne {
+	mutation := newTagMutation(c.config, OpUpdateOne, withTagID(id))
+	return &TagUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for Tag.
+func (c *TagClient) Delete() *TagDelete {
+	mutation := newTagMutation(c.config, OpDelete)
+	return &TagDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *TagClient) DeleteOne(_m *Tag) *TagDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *TagClient) DeleteOneID(id int64) *TagDeleteOne {
+	builder := c.Delete().Where(tag.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &TagDeleteOne{builder}
+}
+
+// Query returns a query builder for Tag.
+func (c *TagClient) Query() *TagQuery {
+	return &TagQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeTag},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a Tag entity by its id.
+func (c *TagClient) Get(ctx context.Context, id int64) (*Tag, error) {
+	return c.Query().Where(tag.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *TagClient) GetX(ctx context.Context, id int64) *Tag {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QuerySnippets queries the snippets edge of a Tag.
+func (c *TagClient) QuerySnippets(_m *Tag) *SnippetQuery {
+	query := (&SnippetClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(tag.Table, tag.FieldID, id),
+			sqlgraph.To(snippet.Table, snippet.FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, true, tag.SnippetsTable, tag.SnippetsPrimaryKey...),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *TagClient) Hooks() []Hook {
+	return c.hooks.Tag
+}
+
+// Interceptors returns the client interceptors.
+func (c *TagClient) Interceptors() []Interceptor {
+	return c.inters.Tag
+}
+
+func (c *TagClient) mutate(ctx context.Context, m *TagMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&TagCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&TagUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&TagUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&TagDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown Tag mutation op: %q", m.Op())
 	}
 }
 
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		Paste []ent.Hook
+		Group, Snippet, Tag []ent.Hook
 	}
 	inters struct {
-		Paste []ent.Interceptor
+		Group, Snippet, Tag []ent.Interceptor
 	}
 )

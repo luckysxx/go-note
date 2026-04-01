@@ -5,25 +5,65 @@ package ent
 import (
 	"time"
 
-	"github.com/luckysxx/go-note/internal/ent/paste"
+	"github.com/luckysxx/go-note/internal/ent/group"
 	"github.com/luckysxx/go-note/internal/ent/schema"
+	"github.com/luckysxx/go-note/internal/ent/snippet"
+	"github.com/luckysxx/go-note/internal/ent/tag"
 )
 
 // The init function reads all schema descriptors with runtime code
 // (default values, validators, hooks and policies) and stitches it
 // to their package variables.
 func init() {
-	pasteFields := schema.Paste{}.Fields()
-	_ = pasteFields
-	// pasteDescOwnerID is the schema descriptor for owner_id field.
-	pasteDescOwnerID := pasteFields[1].Descriptor()
-	// paste.OwnerIDValidator is a validator for the "owner_id" field. It is called by the builders before save.
-	paste.OwnerIDValidator = pasteDescOwnerID.Validators[0].(func(int64) error)
-	// pasteDescTitle is the schema descriptor for title field.
-	pasteDescTitle := pasteFields[2].Descriptor()
-	// paste.TitleValidator is a validator for the "title" field. It is called by the builders before save.
-	paste.TitleValidator = func() func(string) error {
-		validators := pasteDescTitle.Validators
+	groupFields := schema.Group{}.Fields()
+	_ = groupFields
+	// groupDescOwnerID is the schema descriptor for owner_id field.
+	groupDescOwnerID := groupFields[1].Descriptor()
+	// group.OwnerIDValidator is a validator for the "owner_id" field. It is called by the builders before save.
+	group.OwnerIDValidator = groupDescOwnerID.Validators[0].(func(int64) error)
+	// groupDescName is the schema descriptor for name field.
+	groupDescName := groupFields[2].Descriptor()
+	// group.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	group.NameValidator = func() func(string) error {
+		validators := groupDescName.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(name string) error {
+			for _, fn := range fns {
+				if err := fn(name); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// groupDescSortOrder is the schema descriptor for sort_order field.
+	groupDescSortOrder := groupFields[3].Descriptor()
+	// group.DefaultSortOrder holds the default value on creation for the sort_order field.
+	group.DefaultSortOrder = groupDescSortOrder.Default.(int)
+	// groupDescCreatedAt is the schema descriptor for created_at field.
+	groupDescCreatedAt := groupFields[4].Descriptor()
+	// group.DefaultCreatedAt holds the default value on creation for the created_at field.
+	group.DefaultCreatedAt = groupDescCreatedAt.Default.(func() time.Time)
+	// groupDescUpdatedAt is the schema descriptor for updated_at field.
+	groupDescUpdatedAt := groupFields[5].Descriptor()
+	// group.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	group.DefaultUpdatedAt = groupDescUpdatedAt.Default.(func() time.Time)
+	// group.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	group.UpdateDefaultUpdatedAt = groupDescUpdatedAt.UpdateDefault.(func() time.Time)
+	snippetFields := schema.Snippet{}.Fields()
+	_ = snippetFields
+	// snippetDescOwnerID is the schema descriptor for owner_id field.
+	snippetDescOwnerID := snippetFields[1].Descriptor()
+	// snippet.OwnerIDValidator is a validator for the "owner_id" field. It is called by the builders before save.
+	snippet.OwnerIDValidator = snippetDescOwnerID.Validators[0].(func(int64) error)
+	// snippetDescTitle is the schema descriptor for title field.
+	snippetDescTitle := snippetFields[3].Descriptor()
+	// snippet.TitleValidator is a validator for the "title" field. It is called by the builders before save.
+	snippet.TitleValidator = func() func(string) error {
+		validators := snippetDescTitle.Validators
 		fns := [...]func(string) error{
 			validators[0].(func(string) error),
 			validators[1].(func(string) error),
@@ -37,32 +77,66 @@ func init() {
 			return nil
 		}
 	}()
-	// pasteDescShortLink is the schema descriptor for short_link field.
-	pasteDescShortLink := pasteFields[3].Descriptor()
-	// paste.ShortLinkValidator is a validator for the "short_link" field. It is called by the builders before save.
-	paste.ShortLinkValidator = pasteDescShortLink.Validators[0].(func(string) error)
-	// pasteDescContent is the schema descriptor for content field.
-	pasteDescContent := pasteFields[4].Descriptor()
-	// paste.ContentValidator is a validator for the "content" field. It is called by the builders before save.
-	paste.ContentValidator = pasteDescContent.Validators[0].(func(string) error)
-	// pasteDescLanguage is the schema descriptor for language field.
-	pasteDescLanguage := pasteFields[5].Descriptor()
-	// paste.DefaultLanguage holds the default value on creation for the language field.
-	paste.DefaultLanguage = pasteDescLanguage.Default.(string)
-	// paste.LanguageValidator is a validator for the "language" field. It is called by the builders before save.
-	paste.LanguageValidator = pasteDescLanguage.Validators[0].(func(string) error)
-	// pasteDescCreatedAt is the schema descriptor for created_at field.
-	pasteDescCreatedAt := pasteFields[7].Descriptor()
-	// paste.DefaultCreatedAt holds the default value on creation for the created_at field.
-	paste.DefaultCreatedAt = pasteDescCreatedAt.Default.(func() time.Time)
-	// pasteDescUpdatedAt is the schema descriptor for updated_at field.
-	pasteDescUpdatedAt := pasteFields[8].Descriptor()
-	// paste.DefaultUpdatedAt holds the default value on creation for the updated_at field.
-	paste.DefaultUpdatedAt = pasteDescUpdatedAt.Default.(func() time.Time)
-	// paste.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
-	paste.UpdateDefaultUpdatedAt = pasteDescUpdatedAt.UpdateDefault.(func() time.Time)
-	// pasteDescID is the schema descriptor for id field.
-	pasteDescID := pasteFields[0].Descriptor()
-	// paste.IDValidator is a validator for the "id" field. It is called by the builders before save.
-	paste.IDValidator = pasteDescID.Validators[0].(func(int64) error)
+	// snippetDescFileURL is the schema descriptor for file_url field.
+	snippetDescFileURL := snippetFields[5].Descriptor()
+	// snippet.FileURLValidator is a validator for the "file_url" field. It is called by the builders before save.
+	snippet.FileURLValidator = snippetDescFileURL.Validators[0].(func(string) error)
+	// snippetDescFileSize is the schema descriptor for file_size field.
+	snippetDescFileSize := snippetFields[6].Descriptor()
+	// snippet.DefaultFileSize holds the default value on creation for the file_size field.
+	snippet.DefaultFileSize = snippetDescFileSize.Default.(int64)
+	// snippetDescMimeType is the schema descriptor for mime_type field.
+	snippetDescMimeType := snippetFields[7].Descriptor()
+	// snippet.MimeTypeValidator is a validator for the "mime_type" field. It is called by the builders before save.
+	snippet.MimeTypeValidator = snippetDescMimeType.Validators[0].(func(string) error)
+	// snippetDescLanguage is the schema descriptor for language field.
+	snippetDescLanguage := snippetFields[8].Descriptor()
+	// snippet.DefaultLanguage holds the default value on creation for the language field.
+	snippet.DefaultLanguage = snippetDescLanguage.Default.(string)
+	// snippet.LanguageValidator is a validator for the "language" field. It is called by the builders before save.
+	snippet.LanguageValidator = snippetDescLanguage.Validators[0].(func(string) error)
+	// snippetDescCreatedAt is the schema descriptor for created_at field.
+	snippetDescCreatedAt := snippetFields[11].Descriptor()
+	// snippet.DefaultCreatedAt holds the default value on creation for the created_at field.
+	snippet.DefaultCreatedAt = snippetDescCreatedAt.Default.(func() time.Time)
+	// snippetDescUpdatedAt is the schema descriptor for updated_at field.
+	snippetDescUpdatedAt := snippetFields[12].Descriptor()
+	// snippet.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	snippet.DefaultUpdatedAt = snippetDescUpdatedAt.Default.(func() time.Time)
+	// snippet.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	snippet.UpdateDefaultUpdatedAt = snippetDescUpdatedAt.UpdateDefault.(func() time.Time)
+	tagFields := schema.Tag{}.Fields()
+	_ = tagFields
+	// tagDescOwnerID is the schema descriptor for owner_id field.
+	tagDescOwnerID := tagFields[1].Descriptor()
+	// tag.OwnerIDValidator is a validator for the "owner_id" field. It is called by the builders before save.
+	tag.OwnerIDValidator = tagDescOwnerID.Validators[0].(func(int64) error)
+	// tagDescName is the schema descriptor for name field.
+	tagDescName := tagFields[2].Descriptor()
+	// tag.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	tag.NameValidator = func() func(string) error {
+		validators := tagDescName.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(name string) error {
+			for _, fn := range fns {
+				if err := fn(name); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// tagDescColor is the schema descriptor for color field.
+	tagDescColor := tagFields[3].Descriptor()
+	// tag.DefaultColor holds the default value on creation for the color field.
+	tag.DefaultColor = tagDescColor.Default.(string)
+	// tag.ColorValidator is a validator for the "color" field. It is called by the builders before save.
+	tag.ColorValidator = tagDescColor.Validators[0].(func(string) error)
+	// tagDescCreatedAt is the schema descriptor for created_at field.
+	tagDescCreatedAt := tagFields[4].Descriptor()
+	// tag.DefaultCreatedAt holds the default value on creation for the created_at field.
+	tag.DefaultCreatedAt = tagDescCreatedAt.Default.(func() time.Time)
 }

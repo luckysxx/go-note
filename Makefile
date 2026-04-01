@@ -1,11 +1,13 @@
 SHELL := /bin/bash
 
-.PHONY: help run build test lint ent-generate docker-up docker-down docker-build clean
+.PHONY: help run run-grpc build build-grpc test lint ent-generate docker-up docker-down docker-build clean
 
 help:
 	@echo "Available targets:"
 	@echo "  make run              # 启动 go-note HTTP 服务"
+	@echo "  make run-grpc         # 启动 go-note gRPC 服务"
 	@echo "  make build            # 编译二进制"
+	@echo "  make build-grpc       # 编译 gRPC 二进制"
 	@echo "  make test             # 运行所有测试"
 	@echo "  make ent-generate     # 重新生成 Ent 代码"
 	@echo "  make lint             # Go vet + build 检查"
@@ -21,9 +23,16 @@ help:
 run:
 	@go run ./cmd/http/main.go
 
+run-grpc:
+	@go run ./cmd/grpc/main.go
+
 build:
 	@go build -o bin/go-note ./cmd/http/main.go
 	@echo "Binary built: bin/go-note"
+
+build-grpc:
+	@go build -o bin/go-note-grpc ./cmd/grpc/main.go
+	@echo "Binary built: bin/go-note-grpc"
 
 test:
 	@go test ./internal/...
@@ -64,4 +73,3 @@ docker-build:
 clean:
 	@rm -rf bin/
 	@echo "Cleaned"
-

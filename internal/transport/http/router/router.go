@@ -11,8 +11,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// SetupRouter 配置路由
-func SetupRouter(r *gin.Engine, pasteHandler *handler.PasteHandler, log *zap.Logger) {
+// SetupRouter 配置路由。
+func SetupRouter(r *gin.Engine, snippetHandler *handler.SnippetHandler, log *zap.Logger) {
 	r.GET("/metrics", metrics.GinMetricsHandler())
 	r.Use(metrics.GinMetrics())
 	r.Use(otelgin.Middleware("go-note"))
@@ -21,19 +21,19 @@ func SetupRouter(r *gin.Engine, pasteHandler *handler.PasteHandler, log *zap.Log
 
 	v1 := r.Group("/api/v1")
 	{
-		// 需要鉴权的接口（信任网关传来的 X-User-Id）
 		me := v1.Group("/me")
 		me.Use(middleware.GatewayAuth(log))
 		{
-			me.GET("/pastes", pasteHandler.ListMine)
+			me.GET("/snippets", snippetHandler.ListMine)
 		}
 
-		pastes := v1.Group("/pastes")
-		pastes.Use(middleware.GatewayAuth(log))
+		snippets := v1.Group("/snippets")
+		snippets.Use(middleware.GatewayAuth(log))
 		{
-			pastes.POST("", pasteHandler.Create)
-			pastes.GET("/:id", pasteHandler.Get)
-			pastes.PUT("/:id", pasteHandler.Update)
+			snippets.POST("", snippetHandler.Create)
+			snippets.GET("/:id", snippetHandler.Get)
+			snippets.PUT("/:id", snippetHandler.Update)
+			snippets.DELETE("/:id", snippetHandler.Delete)
 		}
 	}
 }

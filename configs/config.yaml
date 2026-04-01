@@ -3,6 +3,12 @@ app_env: "development"
 server:
   port: "8080"
 
+grpc_server:
+  port: "9093"
+
+id_generator:
+  addr: "localhost:50059"
+
 database:
   driver: "postgres"
   source: "" # 机密数据，请在 .env 中设置 DATABASE_SOURCE
@@ -19,3 +25,6 @@ user_platform:
 otel:
   jaeger_endpoint: "localhost:4318"
   service_name: "go-note"
+
+metrics:
+  port: "9094" # gRPC 管理端口，暴露 /metrics /healthz /readyz

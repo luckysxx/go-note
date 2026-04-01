@@ -11,8 +11,10 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/luckysxx/go-note/internal/ent/paste"
+	"github.com/luckysxx/go-note/internal/ent/group"
 	"github.com/luckysxx/go-note/internal/ent/predicate"
+	"github.com/luckysxx/go-note/internal/ent/snippet"
+	"github.com/luckysxx/go-note/internal/ent/tag"
 )
 
 const (
@@ -24,41 +26,44 @@ const (
 	OpUpdateOne = ent.OpUpdateOne
 
 	// Node types.
-	TypePaste = "Paste"
+	TypeGroup   = "Group"
+	TypeSnippet = "Snippet"
+	TypeTag     = "Tag"
 )
 
-// PasteMutation represents an operation that mutates the Paste nodes in the graph.
-type PasteMutation struct {
+// GroupMutation represents an operation that mutates the Group nodes in the graph.
+type GroupMutation struct {
 	config
-	op            Op
-	typ           string
-	id            *int64
-	owner_id      *int64
-	addowner_id   *int64
-	title         *string
-	short_link    *string
-	content       *string
-	language      *string
-	visibility    *paste.Visibility
-	created_at    *time.Time
-	updated_at    *time.Time
-	clearedFields map[string]struct{}
-	done          bool
-	oldValue      func(context.Context) (*Paste, error)
-	predicates    []predicate.Paste
+	op              Op
+	typ             string
+	id              *int64
+	owner_id        *int64
+	addowner_id     *int64
+	name            *string
+	sort_order      *int
+	addsort_order   *int
+	created_at      *time.Time
+	updated_at      *time.Time
+	clearedFields   map[string]struct{}
+	snippets        map[int64]struct{}
+	removedsnippets map[int64]struct{}
+	clearedsnippets bool
+	done            bool
+	oldValue        func(context.Context) (*Group, error)
+	predicates      []predicate.Group
 }
 
-var _ ent.Mutation = (*PasteMutation)(nil)
+var _ ent.Mutation = (*GroupMutation)(nil)
 
-// pasteOption allows management of the mutation configuration using functional options.
-type pasteOption func(*PasteMutation)
+// groupOption allows management of the mutation configuration using functional options.
+type groupOption func(*GroupMutation)
 
-// newPasteMutation creates new mutation for the Paste entity.
-func newPasteMutation(c config, op Op, opts ...pasteOption) *PasteMutation {
-	m := &PasteMutation{
+// newGroupMutation creates new mutation for the Group entity.
+func newGroupMutation(c config, op Op, opts ...groupOption) *GroupMutation {
+	m := &GroupMutation{
 		config:        c,
 		op:            op,
-		typ:           TypePaste,
+		typ:           TypeGroup,
 		clearedFields: make(map[string]struct{}),
 	}
 	for _, opt := range opts {
@@ -67,20 +72,20 @@ func newPasteMutation(c config, op Op, opts ...pasteOption) *PasteMutation {
 	return m
 }
 
-// withPasteID sets the ID field of the mutation.
-func withPasteID(id int64) pasteOption {
-	return func(m *PasteMutation) {
+// withGroupID sets the ID field of the mutation.
+func withGroupID(id int64) groupOption {
+	return func(m *GroupMutation) {
 		var (
 			err   error
 			once  sync.Once
-			value *Paste
+			value *Group
 		)
-		m.oldValue = func(ctx context.Context) (*Paste, error) {
+		m.oldValue = func(ctx context.Context) (*Group, error) {
 			once.Do(func() {
 				if m.done {
 					err = errors.New("querying old values post mutation is not allowed")
 				} else {
-					value, err = m.Client().Paste.Get(ctx, id)
+					value, err = m.Client().Group.Get(ctx, id)
 				}
 			})
 			return value, err
@@ -89,10 +94,10 @@ func withPasteID(id int64) pasteOption {
 	}
 }
 
-// withPaste sets the old Paste of the mutation.
-func withPaste(node *Paste) pasteOption {
-	return func(m *PasteMutation) {
-		m.oldValue = func(context.Context) (*Paste, error) {
+// withGroup sets the old Group of the mutation.
+func withGroup(node *Group) groupOption {
+	return func(m *GroupMutation) {
+		m.oldValue = func(context.Context) (*Group, error) {
 			return node, nil
 		}
 		m.id = &node.ID
@@ -101,7 +106,7 @@ func withPaste(node *Paste) pasteOption {
 
 // Client returns a new `ent.Client` from the mutation. If the mutation was
 // executed in a transaction (ent.Tx), a transactional client is returned.
-func (m PasteMutation) Client() *Client {
+func (m GroupMutation) Client() *Client {
 	client := &Client{config: m.config}
 	client.init()
 	return client
@@ -109,7 +114,7 @@ func (m PasteMutation) Client() *Client {
 
 // Tx returns an `ent.Tx` for mutations that were executed in transactions;
 // it returns an error otherwise.
-func (m PasteMutation) Tx() (*Tx, error) {
+func (m GroupMutation) Tx() (*Tx, error) {
 	if _, ok := m.driver.(*txDriver); !ok {
 		return nil, errors.New("ent: mutation is not running in a transaction")
 	}
@@ -119,14 +124,14 @@ func (m PasteMutation) Tx() (*Tx, error) {
 }
 
 // SetID sets the value of the id field. Note that this
-// operation is only accepted on creation of Paste entities.
-func (m *PasteMutation) SetID(id int64) {
+// operation is only accepted on creation of Group entities.
+func (m *GroupMutation) SetID(id int64) {
 	m.id = &id
 }
 
 // ID returns the ID value in the mutation. Note that the ID is only available
 // if it was provided to the builder or after it was returned from the database.
-func (m *PasteMutation) ID() (id int64, exists bool) {
+func (m *GroupMutation) ID() (id int64, exists bool) {
 	if m.id == nil {
 		return
 	}
@@ -137,7 +142,7 @@ func (m *PasteMutation) ID() (id int64, exists bool) {
 // That means, if the mutation is applied within a transaction with an isolation level such
 // as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
 // or updated by the mutation.
-func (m *PasteMutation) IDs(ctx context.Context) ([]int64, error) {
+func (m *GroupMutation) IDs(ctx context.Context) ([]int64, error) {
 	switch {
 	case m.op.Is(OpUpdateOne | OpDeleteOne):
 		id, exists := m.ID()
@@ -146,20 +151,20 @@ func (m *PasteMutation) IDs(ctx context.Context) ([]int64, error) {
 		}
 		fallthrough
 	case m.op.Is(OpUpdate | OpDelete):
-		return m.Client().Paste.Query().Where(m.predicates...).IDs(ctx)
+		return m.Client().Group.Query().Where(m.predicates...).IDs(ctx)
 	default:
 		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
 	}
 }
 
 // SetOwnerID sets the "owner_id" field.
-func (m *PasteMutation) SetOwnerID(i int64) {
+func (m *GroupMutation) SetOwnerID(i int64) {
 	m.owner_id = &i
 	m.addowner_id = nil
 }
 
 // OwnerID returns the value of the "owner_id" field in the mutation.
-func (m *PasteMutation) OwnerID() (r int64, exists bool) {
+func (m *GroupMutation) OwnerID() (r int64, exists bool) {
 	v := m.owner_id
 	if v == nil {
 		return
@@ -167,10 +172,10 @@ func (m *PasteMutation) OwnerID() (r int64, exists bool) {
 	return *v, true
 }
 
-// OldOwnerID returns the old "owner_id" field's value of the Paste entity.
-// If the Paste object wasn't provided to the builder, the object is fetched from the database.
+// OldOwnerID returns the old "owner_id" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PasteMutation) OldOwnerID(ctx context.Context) (v int64, err error) {
+func (m *GroupMutation) OldOwnerID(ctx context.Context) (v int64, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOwnerID is only allowed on UpdateOne operations")
 	}
@@ -185,7 +190,7 @@ func (m *PasteMutation) OldOwnerID(ctx context.Context) (v int64, err error) {
 }
 
 // AddOwnerID adds i to the "owner_id" field.
-func (m *PasteMutation) AddOwnerID(i int64) {
+func (m *GroupMutation) AddOwnerID(i int64) {
 	if m.addowner_id != nil {
 		*m.addowner_id += i
 	} else {
@@ -194,7 +199,7 @@ func (m *PasteMutation) AddOwnerID(i int64) {
 }
 
 // AddedOwnerID returns the value that was added to the "owner_id" field in this mutation.
-func (m *PasteMutation) AddedOwnerID() (r int64, exists bool) {
+func (m *GroupMutation) AddedOwnerID() (r int64, exists bool) {
 	v := m.addowner_id
 	if v == nil {
 		return
@@ -203,211 +208,110 @@ func (m *PasteMutation) AddedOwnerID() (r int64, exists bool) {
 }
 
 // ResetOwnerID resets all changes to the "owner_id" field.
-func (m *PasteMutation) ResetOwnerID() {
+func (m *GroupMutation) ResetOwnerID() {
 	m.owner_id = nil
 	m.addowner_id = nil
 }
 
-// SetTitle sets the "title" field.
-func (m *PasteMutation) SetTitle(s string) {
-	m.title = &s
+// SetName sets the "name" field.
+func (m *GroupMutation) SetName(s string) {
+	m.name = &s
 }
 
-// Title returns the value of the "title" field in the mutation.
-func (m *PasteMutation) Title() (r string, exists bool) {
-	v := m.title
+// Name returns the value of the "name" field in the mutation.
+func (m *GroupMutation) Name() (r string, exists bool) {
+	v := m.name
 	if v == nil {
 		return
 	}
 	return *v, true
 }
 
-// OldTitle returns the old "title" field's value of the Paste entity.
-// If the Paste object wasn't provided to the builder, the object is fetched from the database.
+// OldName returns the old "name" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PasteMutation) OldTitle(ctx context.Context) (v string, err error) {
+func (m *GroupMutation) OldName(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldTitle is only allowed on UpdateOne operations")
+		return v, errors.New("OldName is only allowed on UpdateOne operations")
 	}
 	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldTitle requires an ID field in the mutation")
+		return v, errors.New("OldName requires an ID field in the mutation")
 	}
 	oldValue, err := m.oldValue(ctx)
 	if err != nil {
-		return v, fmt.Errorf("querying old value for OldTitle: %w", err)
+		return v, fmt.Errorf("querying old value for OldName: %w", err)
 	}
-	return oldValue.Title, nil
+	return oldValue.Name, nil
 }
 
-// ResetTitle resets all changes to the "title" field.
-func (m *PasteMutation) ResetTitle() {
-	m.title = nil
+// ResetName resets all changes to the "name" field.
+func (m *GroupMutation) ResetName() {
+	m.name = nil
 }
 
-// SetShortLink sets the "short_link" field.
-func (m *PasteMutation) SetShortLink(s string) {
-	m.short_link = &s
+// SetSortOrder sets the "sort_order" field.
+func (m *GroupMutation) SetSortOrder(i int) {
+	m.sort_order = &i
+	m.addsort_order = nil
 }
 
-// ShortLink returns the value of the "short_link" field in the mutation.
-func (m *PasteMutation) ShortLink() (r string, exists bool) {
-	v := m.short_link
+// SortOrder returns the value of the "sort_order" field in the mutation.
+func (m *GroupMutation) SortOrder() (r int, exists bool) {
+	v := m.sort_order
 	if v == nil {
 		return
 	}
 	return *v, true
 }
 
-// OldShortLink returns the old "short_link" field's value of the Paste entity.
-// If the Paste object wasn't provided to the builder, the object is fetched from the database.
+// OldSortOrder returns the old "sort_order" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PasteMutation) OldShortLink(ctx context.Context) (v string, err error) {
+func (m *GroupMutation) OldSortOrder(ctx context.Context) (v int, err error) {
 	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldShortLink is only allowed on UpdateOne operations")
+		return v, errors.New("OldSortOrder is only allowed on UpdateOne operations")
 	}
 	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldShortLink requires an ID field in the mutation")
+		return v, errors.New("OldSortOrder requires an ID field in the mutation")
 	}
 	oldValue, err := m.oldValue(ctx)
 	if err != nil {
-		return v, fmt.Errorf("querying old value for OldShortLink: %w", err)
+		return v, fmt.Errorf("querying old value for OldSortOrder: %w", err)
 	}
-	return oldValue.ShortLink, nil
+	return oldValue.SortOrder, nil
 }
 
-// ClearShortLink clears the value of the "short_link" field.
-func (m *PasteMutation) ClearShortLink() {
-	m.short_link = nil
-	m.clearedFields[paste.FieldShortLink] = struct{}{}
+// AddSortOrder adds i to the "sort_order" field.
+func (m *GroupMutation) AddSortOrder(i int) {
+	if m.addsort_order != nil {
+		*m.addsort_order += i
+	} else {
+		m.addsort_order = &i
+	}
 }
 
-// ShortLinkCleared returns if the "short_link" field was cleared in this mutation.
-func (m *PasteMutation) ShortLinkCleared() bool {
-	_, ok := m.clearedFields[paste.FieldShortLink]
-	return ok
-}
-
-// ResetShortLink resets all changes to the "short_link" field.
-func (m *PasteMutation) ResetShortLink() {
-	m.short_link = nil
-	delete(m.clearedFields, paste.FieldShortLink)
-}
-
-// SetContent sets the "content" field.
-func (m *PasteMutation) SetContent(s string) {
-	m.content = &s
-}
-
-// Content returns the value of the "content" field in the mutation.
-func (m *PasteMutation) Content() (r string, exists bool) {
-	v := m.content
+// AddedSortOrder returns the value that was added to the "sort_order" field in this mutation.
+func (m *GroupMutation) AddedSortOrder() (r int, exists bool) {
+	v := m.addsort_order
 	if v == nil {
 		return
 	}
 	return *v, true
 }
 
-// OldContent returns the old "content" field's value of the Paste entity.
-// If the Paste object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PasteMutation) OldContent(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldContent is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldContent requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldContent: %w", err)
-	}
-	return oldValue.Content, nil
-}
-
-// ResetContent resets all changes to the "content" field.
-func (m *PasteMutation) ResetContent() {
-	m.content = nil
-}
-
-// SetLanguage sets the "language" field.
-func (m *PasteMutation) SetLanguage(s string) {
-	m.language = &s
-}
-
-// Language returns the value of the "language" field in the mutation.
-func (m *PasteMutation) Language() (r string, exists bool) {
-	v := m.language
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldLanguage returns the old "language" field's value of the Paste entity.
-// If the Paste object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PasteMutation) OldLanguage(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldLanguage is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldLanguage requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldLanguage: %w", err)
-	}
-	return oldValue.Language, nil
-}
-
-// ResetLanguage resets all changes to the "language" field.
-func (m *PasteMutation) ResetLanguage() {
-	m.language = nil
-}
-
-// SetVisibility sets the "visibility" field.
-func (m *PasteMutation) SetVisibility(pa paste.Visibility) {
-	m.visibility = &pa
-}
-
-// Visibility returns the value of the "visibility" field in the mutation.
-func (m *PasteMutation) Visibility() (r paste.Visibility, exists bool) {
-	v := m.visibility
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldVisibility returns the old "visibility" field's value of the Paste entity.
-// If the Paste object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PasteMutation) OldVisibility(ctx context.Context) (v paste.Visibility, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldVisibility is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldVisibility requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldVisibility: %w", err)
-	}
-	return oldValue.Visibility, nil
-}
-
-// ResetVisibility resets all changes to the "visibility" field.
-func (m *PasteMutation) ResetVisibility() {
-	m.visibility = nil
+// ResetSortOrder resets all changes to the "sort_order" field.
+func (m *GroupMutation) ResetSortOrder() {
+	m.sort_order = nil
+	m.addsort_order = nil
 }
 
 // SetCreatedAt sets the "created_at" field.
-func (m *PasteMutation) SetCreatedAt(t time.Time) {
+func (m *GroupMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
 }
 
 // CreatedAt returns the value of the "created_at" field in the mutation.
-func (m *PasteMutation) CreatedAt() (r time.Time, exists bool) {
+func (m *GroupMutation) CreatedAt() (r time.Time, exists bool) {
 	v := m.created_at
 	if v == nil {
 		return
@@ -415,10 +319,10 @@ func (m *PasteMutation) CreatedAt() (r time.Time, exists bool) {
 	return *v, true
 }
 
-// OldCreatedAt returns the old "created_at" field's value of the Paste entity.
-// If the Paste object wasn't provided to the builder, the object is fetched from the database.
+// OldCreatedAt returns the old "created_at" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PasteMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+func (m *GroupMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
 	}
@@ -433,17 +337,17 @@ func (m *PasteMutation) OldCreatedAt(ctx context.Context) (v time.Time, err erro
 }
 
 // ResetCreatedAt resets all changes to the "created_at" field.
-func (m *PasteMutation) ResetCreatedAt() {
+func (m *GroupMutation) ResetCreatedAt() {
 	m.created_at = nil
 }
 
 // SetUpdatedAt sets the "updated_at" field.
-func (m *PasteMutation) SetUpdatedAt(t time.Time) {
+func (m *GroupMutation) SetUpdatedAt(t time.Time) {
 	m.updated_at = &t
 }
 
 // UpdatedAt returns the value of the "updated_at" field in the mutation.
-func (m *PasteMutation) UpdatedAt() (r time.Time, exists bool) {
+func (m *GroupMutation) UpdatedAt() (r time.Time, exists bool) {
 	v := m.updated_at
 	if v == nil {
 		return
@@ -451,10 +355,10 @@ func (m *PasteMutation) UpdatedAt() (r time.Time, exists bool) {
 	return *v, true
 }
 
-// OldUpdatedAt returns the old "updated_at" field's value of the Paste entity.
-// If the Paste object wasn't provided to the builder, the object is fetched from the database.
+// OldUpdatedAt returns the old "updated_at" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PasteMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+func (m *GroupMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
 	}
@@ -469,19 +373,73 @@ func (m *PasteMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err erro
 }
 
 // ResetUpdatedAt resets all changes to the "updated_at" field.
-func (m *PasteMutation) ResetUpdatedAt() {
+func (m *GroupMutation) ResetUpdatedAt() {
 	m.updated_at = nil
 }
 
-// Where appends a list predicates to the PasteMutation builder.
-func (m *PasteMutation) Where(ps ...predicate.Paste) {
+// AddSnippetIDs adds the "snippets" edge to the Snippet entity by ids.
+func (m *GroupMutation) AddSnippetIDs(ids ...int64) {
+	if m.snippets == nil {
+		m.snippets = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.snippets[ids[i]] = struct{}{}
+	}
+}
+
+// ClearSnippets clears the "snippets" edge to the Snippet entity.
+func (m *GroupMutation) ClearSnippets() {
+	m.clearedsnippets = true
+}
+
+// SnippetsCleared reports if the "snippets" edge to the Snippet entity was cleared.
+func (m *GroupMutation) SnippetsCleared() bool {
+	return m.clearedsnippets
+}
+
+// RemoveSnippetIDs removes the "snippets" edge to the Snippet entity by IDs.
+func (m *GroupMutation) RemoveSnippetIDs(ids ...int64) {
+	if m.removedsnippets == nil {
+		m.removedsnippets = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.snippets, ids[i])
+		m.removedsnippets[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedSnippets returns the removed IDs of the "snippets" edge to the Snippet entity.
+func (m *GroupMutation) RemovedSnippetsIDs() (ids []int64) {
+	for id := range m.removedsnippets {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// SnippetsIDs returns the "snippets" edge IDs in the mutation.
+func (m *GroupMutation) SnippetsIDs() (ids []int64) {
+	for id := range m.snippets {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetSnippets resets all changes to the "snippets" edge.
+func (m *GroupMutation) ResetSnippets() {
+	m.snippets = nil
+	m.clearedsnippets = false
+	m.removedsnippets = nil
+}
+
+// Where appends a list predicates to the GroupMutation builder.
+func (m *GroupMutation) Where(ps ...predicate.Group) {
 	m.predicates = append(m.predicates, ps...)
 }
 
-// WhereP appends storage-level predicates to the PasteMutation builder. Using this method,
+// WhereP appends storage-level predicates to the GroupMutation builder. Using this method,
 // users can use type-assertion to append predicates that do not depend on any generated package.
-func (m *PasteMutation) WhereP(ps ...func(*sql.Selector)) {
-	p := make([]predicate.Paste, len(ps))
+func (m *GroupMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.Group, len(ps))
 	for i := range ps {
 		p[i] = ps[i]
 	}
@@ -489,48 +447,39 @@ func (m *PasteMutation) WhereP(ps ...func(*sql.Selector)) {
 }
 
 // Op returns the operation name.
-func (m *PasteMutation) Op() Op {
+func (m *GroupMutation) Op() Op {
 	return m.op
 }
 
 // SetOp allows setting the mutation operation.
-func (m *PasteMutation) SetOp(op Op) {
+func (m *GroupMutation) SetOp(op Op) {
 	m.op = op
 }
 
-// Type returns the node type of this mutation (Paste).
-func (m *PasteMutation) Type() string {
+// Type returns the node type of this mutation (Group).
+func (m *GroupMutation) Type() string {
 	return m.typ
 }
 
 // Fields returns all fields that were changed during this mutation. Note that in
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
-func (m *PasteMutation) Fields() []string {
-	fields := make([]string, 0, 8)
+func (m *GroupMutation) Fields() []string {
+	fields := make([]string, 0, 5)
 	if m.owner_id != nil {
-		fields = append(fields, paste.FieldOwnerID)
+		fields = append(fields, group.FieldOwnerID)
 	}
-	if m.title != nil {
-		fields = append(fields, paste.FieldTitle)
+	if m.name != nil {
+		fields = append(fields, group.FieldName)
 	}
-	if m.short_link != nil {
-		fields = append(fields, paste.FieldShortLink)
-	}
-	if m.content != nil {
-		fields = append(fields, paste.FieldContent)
-	}
-	if m.language != nil {
-		fields = append(fields, paste.FieldLanguage)
-	}
-	if m.visibility != nil {
-		fields = append(fields, paste.FieldVisibility)
+	if m.sort_order != nil {
+		fields = append(fields, group.FieldSortOrder)
 	}
 	if m.created_at != nil {
-		fields = append(fields, paste.FieldCreatedAt)
+		fields = append(fields, group.FieldCreatedAt)
 	}
 	if m.updated_at != nil {
-		fields = append(fields, paste.FieldUpdatedAt)
+		fields = append(fields, group.FieldUpdatedAt)
 	}
 	return fields
 }
@@ -538,23 +487,17 @@ func (m *PasteMutation) Fields() []string {
 // Field returns the value of a field with the given name. The second boolean
 // return value indicates that this field was not set, or was not defined in the
 // schema.
-func (m *PasteMutation) Field(name string) (ent.Value, bool) {
+func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 	switch name {
-	case paste.FieldOwnerID:
+	case group.FieldOwnerID:
 		return m.OwnerID()
-	case paste.FieldTitle:
-		return m.Title()
-	case paste.FieldShortLink:
-		return m.ShortLink()
-	case paste.FieldContent:
-		return m.Content()
-	case paste.FieldLanguage:
-		return m.Language()
-	case paste.FieldVisibility:
-		return m.Visibility()
-	case paste.FieldCreatedAt:
+	case group.FieldName:
+		return m.Name()
+	case group.FieldSortOrder:
+		return m.SortOrder()
+	case group.FieldCreatedAt:
 		return m.CreatedAt()
-	case paste.FieldUpdatedAt:
+	case group.FieldUpdatedAt:
 		return m.UpdatedAt()
 	}
 	return nil, false
@@ -563,83 +506,56 @@ func (m *PasteMutation) Field(name string) (ent.Value, bool) {
 // OldField returns the old value of the field from the database. An error is
 // returned if the mutation operation is not UpdateOne, or the query to the
 // database failed.
-func (m *PasteMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
 	switch name {
-	case paste.FieldOwnerID:
+	case group.FieldOwnerID:
 		return m.OldOwnerID(ctx)
-	case paste.FieldTitle:
-		return m.OldTitle(ctx)
-	case paste.FieldShortLink:
-		return m.OldShortLink(ctx)
-	case paste.FieldContent:
-		return m.OldContent(ctx)
-	case paste.FieldLanguage:
-		return m.OldLanguage(ctx)
-	case paste.FieldVisibility:
-		return m.OldVisibility(ctx)
-	case paste.FieldCreatedAt:
+	case group.FieldName:
+		return m.OldName(ctx)
+	case group.FieldSortOrder:
+		return m.OldSortOrder(ctx)
+	case group.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
-	case paste.FieldUpdatedAt:
+	case group.FieldUpdatedAt:
 		return m.OldUpdatedAt(ctx)
 	}
-	return nil, fmt.Errorf("unknown Paste field %s", name)
+	return nil, fmt.Errorf("unknown Group field %s", name)
 }
 
 // SetField sets the value of a field with the given name. It returns an error if
 // the field is not defined in the schema, or if the type mismatched the field
 // type.
-func (m *PasteMutation) SetField(name string, value ent.Value) error {
+func (m *GroupMutation) SetField(name string, value ent.Value) error {
 	switch name {
-	case paste.FieldOwnerID:
+	case group.FieldOwnerID:
 		v, ok := value.(int64)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOwnerID(v)
 		return nil
-	case paste.FieldTitle:
+	case group.FieldName:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
-		m.SetTitle(v)
+		m.SetName(v)
 		return nil
-	case paste.FieldShortLink:
-		v, ok := value.(string)
+	case group.FieldSortOrder:
+		v, ok := value.(int)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
-		m.SetShortLink(v)
+		m.SetSortOrder(v)
 		return nil
-	case paste.FieldContent:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetContent(v)
-		return nil
-	case paste.FieldLanguage:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetLanguage(v)
-		return nil
-	case paste.FieldVisibility:
-		v, ok := value.(paste.Visibility)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetVisibility(v)
-		return nil
-	case paste.FieldCreatedAt:
+	case group.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCreatedAt(v)
 		return nil
-	case paste.FieldUpdatedAt:
+	case group.FieldUpdatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
@@ -647,15 +563,18 @@ func (m *PasteMutation) SetField(name string, value ent.Value) error {
 		m.SetUpdatedAt(v)
 		return nil
 	}
-	return fmt.Errorf("unknown Paste field %s", name)
+	return fmt.Errorf("unknown Group field %s", name)
 }
 
 // AddedFields returns all numeric fields that were incremented/decremented during
 // this mutation.
-func (m *PasteMutation) AddedFields() []string {
+func (m *GroupMutation) AddedFields() []string {
 	var fields []string
 	if m.addowner_id != nil {
-		fields = append(fields, paste.FieldOwnerID)
+		fields = append(fields, group.FieldOwnerID)
+	}
+	if m.addsort_order != nil {
+		fields = append(fields, group.FieldSortOrder)
 	}
 	return fields
 }
@@ -663,9 +582,1890 @@ func (m *PasteMutation) AddedFields() []string {
 // AddedField returns the numeric value that was incremented/decremented on a field
 // with the given name. The second boolean return value indicates that this field
 // was not set, or was not defined in the schema.
-func (m *PasteMutation) AddedField(name string) (ent.Value, bool) {
+func (m *GroupMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
-	case paste.FieldOwnerID:
+	case group.FieldOwnerID:
+		return m.AddedOwnerID()
+	case group.FieldSortOrder:
+		return m.AddedSortOrder()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *GroupMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case group.FieldOwnerID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddOwnerID(v)
+		return nil
+	case group.FieldSortOrder:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSortOrder(v)
+		return nil
+	}
+	return fmt.Errorf("unknown Group numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *GroupMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *GroupMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *GroupMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown Group nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *GroupMutation) ResetField(name string) error {
+	switch name {
+	case group.FieldOwnerID:
+		m.ResetOwnerID()
+		return nil
+	case group.FieldName:
+		m.ResetName()
+		return nil
+	case group.FieldSortOrder:
+		m.ResetSortOrder()
+		return nil
+	case group.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case group.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown Group field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *GroupMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.snippets != nil {
+		edges = append(edges, group.EdgeSnippets)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *GroupMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case group.EdgeSnippets:
+		ids := make([]ent.Value, 0, len(m.snippets))
+		for id := range m.snippets {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *GroupMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.removedsnippets != nil {
+		edges = append(edges, group.EdgeSnippets)
+	}
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *GroupMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case group.EdgeSnippets:
+		ids := make([]ent.Value, 0, len(m.removedsnippets))
+		for id := range m.removedsnippets {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *GroupMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedsnippets {
+		edges = append(edges, group.EdgeSnippets)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *GroupMutation) EdgeCleared(name string) bool {
+	switch name {
+	case group.EdgeSnippets:
+		return m.clearedsnippets
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *GroupMutation) ClearEdge(name string) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown Group unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *GroupMutation) ResetEdge(name string) error {
+	switch name {
+	case group.EdgeSnippets:
+		m.ResetSnippets()
+		return nil
+	}
+	return fmt.Errorf("unknown Group edge %s", name)
+}
+
+// SnippetMutation represents an operation that mutates the Snippet nodes in the graph.
+type SnippetMutation struct {
+	config
+	op            Op
+	typ           string
+	id            *int64
+	owner_id      *int64
+	addowner_id   *int64
+	_type         *snippet.Type
+	title         *string
+	content       *string
+	file_url      *string
+	file_size     *int64
+	addfile_size  *int64
+	mime_type     *string
+	language      *string
+	visibility    *snippet.Visibility
+	created_at    *time.Time
+	updated_at    *time.Time
+	clearedFields map[string]struct{}
+	group         *int64
+	clearedgroup  bool
+	tags          map[int64]struct{}
+	removedtags   map[int64]struct{}
+	clearedtags   bool
+	done          bool
+	oldValue      func(context.Context) (*Snippet, error)
+	predicates    []predicate.Snippet
+}
+
+var _ ent.Mutation = (*SnippetMutation)(nil)
+
+// snippetOption allows management of the mutation configuration using functional options.
+type snippetOption func(*SnippetMutation)
+
+// newSnippetMutation creates new mutation for the Snippet entity.
+func newSnippetMutation(c config, op Op, opts ...snippetOption) *SnippetMutation {
+	m := &SnippetMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeSnippet,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withSnippetID sets the ID field of the mutation.
+func withSnippetID(id int64) snippetOption {
+	return func(m *SnippetMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *Snippet
+		)
+		m.oldValue = func(ctx context.Context) (*Snippet, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().Snippet.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withSnippet sets the old Snippet of the mutation.
+func withSnippet(node *Snippet) snippetOption {
+	return func(m *SnippetMutation) {
+		m.oldValue = func(context.Context) (*Snippet, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m SnippetMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m SnippetMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of Snippet entities.
+func (m *SnippetMutation) SetID(id int64) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *SnippetMutation) ID() (id int64, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *SnippetMutation) IDs(ctx context.Context) ([]int64, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int64{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().Snippet.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetOwnerID sets the "owner_id" field.
+func (m *SnippetMutation) SetOwnerID(i int64) {
+	m.owner_id = &i
+	m.addowner_id = nil
+}
+
+// OwnerID returns the value of the "owner_id" field in the mutation.
+func (m *SnippetMutation) OwnerID() (r int64, exists bool) {
+	v := m.owner_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOwnerID returns the old "owner_id" field's value of the Snippet entity.
+// If the Snippet object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SnippetMutation) OldOwnerID(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOwnerID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOwnerID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOwnerID: %w", err)
+	}
+	return oldValue.OwnerID, nil
+}
+
+// AddOwnerID adds i to the "owner_id" field.
+func (m *SnippetMutation) AddOwnerID(i int64) {
+	if m.addowner_id != nil {
+		*m.addowner_id += i
+	} else {
+		m.addowner_id = &i
+	}
+}
+
+// AddedOwnerID returns the value that was added to the "owner_id" field in this mutation.
+func (m *SnippetMutation) AddedOwnerID() (r int64, exists bool) {
+	v := m.addowner_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetOwnerID resets all changes to the "owner_id" field.
+func (m *SnippetMutation) ResetOwnerID() {
+	m.owner_id = nil
+	m.addowner_id = nil
+}
+
+// SetType sets the "type" field.
+func (m *SnippetMutation) SetType(s snippet.Type) {
+	m._type = &s
+}
+
+// GetType returns the value of the "type" field in the mutation.
+func (m *SnippetMutation) GetType() (r snippet.Type, exists bool) {
+	v := m._type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldType returns the old "type" field's value of the Snippet entity.
+// If the Snippet object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SnippetMutation) OldType(ctx context.Context) (v snippet.Type, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldType: %w", err)
+	}
+	return oldValue.Type, nil
+}
+
+// ResetType resets all changes to the "type" field.
+func (m *SnippetMutation) ResetType() {
+	m._type = nil
+}
+
+// SetTitle sets the "title" field.
+func (m *SnippetMutation) SetTitle(s string) {
+	m.title = &s
+}
+
+// Title returns the value of the "title" field in the mutation.
+func (m *SnippetMutation) Title() (r string, exists bool) {
+	v := m.title
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTitle returns the old "title" field's value of the Snippet entity.
+// If the Snippet object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SnippetMutation) OldTitle(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTitle is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTitle requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTitle: %w", err)
+	}
+	return oldValue.Title, nil
+}
+
+// ResetTitle resets all changes to the "title" field.
+func (m *SnippetMutation) ResetTitle() {
+	m.title = nil
+}
+
+// SetContent sets the "content" field.
+func (m *SnippetMutation) SetContent(s string) {
+	m.content = &s
+}
+
+// Content returns the value of the "content" field in the mutation.
+func (m *SnippetMutation) Content() (r string, exists bool) {
+	v := m.content
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldContent returns the old "content" field's value of the Snippet entity.
+// If the Snippet object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SnippetMutation) OldContent(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldContent is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldContent requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldContent: %w", err)
+	}
+	return oldValue.Content, nil
+}
+
+// ClearContent clears the value of the "content" field.
+func (m *SnippetMutation) ClearContent() {
+	m.content = nil
+	m.clearedFields[snippet.FieldContent] = struct{}{}
+}
+
+// ContentCleared returns if the "content" field was cleared in this mutation.
+func (m *SnippetMutation) ContentCleared() bool {
+	_, ok := m.clearedFields[snippet.FieldContent]
+	return ok
+}
+
+// ResetContent resets all changes to the "content" field.
+func (m *SnippetMutation) ResetContent() {
+	m.content = nil
+	delete(m.clearedFields, snippet.FieldContent)
+}
+
+// SetFileURL sets the "file_url" field.
+func (m *SnippetMutation) SetFileURL(s string) {
+	m.file_url = &s
+}
+
+// FileURL returns the value of the "file_url" field in the mutation.
+func (m *SnippetMutation) FileURL() (r string, exists bool) {
+	v := m.file_url
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFileURL returns the old "file_url" field's value of the Snippet entity.
+// If the Snippet object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SnippetMutation) OldFileURL(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFileURL is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFileURL requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFileURL: %w", err)
+	}
+	return oldValue.FileURL, nil
+}
+
+// ClearFileURL clears the value of the "file_url" field.
+func (m *SnippetMutation) ClearFileURL() {
+	m.file_url = nil
+	m.clearedFields[snippet.FieldFileURL] = struct{}{}
+}
+
+// FileURLCleared returns if the "file_url" field was cleared in this mutation.
+func (m *SnippetMutation) FileURLCleared() bool {
+	_, ok := m.clearedFields[snippet.FieldFileURL]
+	return ok
+}
+
+// ResetFileURL resets all changes to the "file_url" field.
+func (m *SnippetMutation) ResetFileURL() {
+	m.file_url = nil
+	delete(m.clearedFields, snippet.FieldFileURL)
+}
+
+// SetFileSize sets the "file_size" field.
+func (m *SnippetMutation) SetFileSize(i int64) {
+	m.file_size = &i
+	m.addfile_size = nil
+}
+
+// FileSize returns the value of the "file_size" field in the mutation.
+func (m *SnippetMutation) FileSize() (r int64, exists bool) {
+	v := m.file_size
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFileSize returns the old "file_size" field's value of the Snippet entity.
+// If the Snippet object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SnippetMutation) OldFileSize(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFileSize is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFileSize requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFileSize: %w", err)
+	}
+	return oldValue.FileSize, nil
+}
+
+// AddFileSize adds i to the "file_size" field.
+func (m *SnippetMutation) AddFileSize(i int64) {
+	if m.addfile_size != nil {
+		*m.addfile_size += i
+	} else {
+		m.addfile_size = &i
+	}
+}
+
+// AddedFileSize returns the value that was added to the "file_size" field in this mutation.
+func (m *SnippetMutation) AddedFileSize() (r int64, exists bool) {
+	v := m.addfile_size
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearFileSize clears the value of the "file_size" field.
+func (m *SnippetMutation) ClearFileSize() {
+	m.file_size = nil
+	m.addfile_size = nil
+	m.clearedFields[snippet.FieldFileSize] = struct{}{}
+}
+
+// FileSizeCleared returns if the "file_size" field was cleared in this mutation.
+func (m *SnippetMutation) FileSizeCleared() bool {
+	_, ok := m.clearedFields[snippet.FieldFileSize]
+	return ok
+}
+
+// ResetFileSize resets all changes to the "file_size" field.
+func (m *SnippetMutation) ResetFileSize() {
+	m.file_size = nil
+	m.addfile_size = nil
+	delete(m.clearedFields, snippet.FieldFileSize)
+}
+
+// SetMimeType sets the "mime_type" field.
+func (m *SnippetMutation) SetMimeType(s string) {
+	m.mime_type = &s
+}
+
+// MimeType returns the value of the "mime_type" field in the mutation.
+func (m *SnippetMutation) MimeType() (r string, exists bool) {
+	v := m.mime_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMimeType returns the old "mime_type" field's value of the Snippet entity.
+// If the Snippet object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SnippetMutation) OldMimeType(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMimeType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMimeType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMimeType: %w", err)
+	}
+	return oldValue.MimeType, nil
+}
+
+// ClearMimeType clears the value of the "mime_type" field.
+func (m *SnippetMutation) ClearMimeType() {
+	m.mime_type = nil
+	m.clearedFields[snippet.FieldMimeType] = struct{}{}
+}
+
+// MimeTypeCleared returns if the "mime_type" field was cleared in this mutation.
+func (m *SnippetMutation) MimeTypeCleared() bool {
+	_, ok := m.clearedFields[snippet.FieldMimeType]
+	return ok
+}
+
+// ResetMimeType resets all changes to the "mime_type" field.
+func (m *SnippetMutation) ResetMimeType() {
+	m.mime_type = nil
+	delete(m.clearedFields, snippet.FieldMimeType)
+}
+
+// SetLanguage sets the "language" field.
+func (m *SnippetMutation) SetLanguage(s string) {
+	m.language = &s
+}
+
+// Language returns the value of the "language" field in the mutation.
+func (m *SnippetMutation) Language() (r string, exists bool) {
+	v := m.language
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLanguage returns the old "language" field's value of the Snippet entity.
+// If the Snippet object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SnippetMutation) OldLanguage(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLanguage is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLanguage requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLanguage: %w", err)
+	}
+	return oldValue.Language, nil
+}
+
+// ResetLanguage resets all changes to the "language" field.
+func (m *SnippetMutation) ResetLanguage() {
+	m.language = nil
+}
+
+// SetVisibility sets the "visibility" field.
+func (m *SnippetMutation) SetVisibility(s snippet.Visibility) {
+	m.visibility = &s
+}
+
+// Visibility returns the value of the "visibility" field in the mutation.
+func (m *SnippetMutation) Visibility() (r snippet.Visibility, exists bool) {
+	v := m.visibility
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVisibility returns the old "visibility" field's value of the Snippet entity.
+// If the Snippet object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SnippetMutation) OldVisibility(ctx context.Context) (v snippet.Visibility, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVisibility is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVisibility requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVisibility: %w", err)
+	}
+	return oldValue.Visibility, nil
+}
+
+// ResetVisibility resets all changes to the "visibility" field.
+func (m *SnippetMutation) ResetVisibility() {
+	m.visibility = nil
+}
+
+// SetGroupID sets the "group_id" field.
+func (m *SnippetMutation) SetGroupID(i int64) {
+	m.group = &i
+}
+
+// GroupID returns the value of the "group_id" field in the mutation.
+func (m *SnippetMutation) GroupID() (r int64, exists bool) {
+	v := m.group
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldGroupID returns the old "group_id" field's value of the Snippet entity.
+// If the Snippet object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SnippetMutation) OldGroupID(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldGroupID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldGroupID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldGroupID: %w", err)
+	}
+	return oldValue.GroupID, nil
+}
+
+// ClearGroupID clears the value of the "group_id" field.
+func (m *SnippetMutation) ClearGroupID() {
+	m.group = nil
+	m.clearedFields[snippet.FieldGroupID] = struct{}{}
+}
+
+// GroupIDCleared returns if the "group_id" field was cleared in this mutation.
+func (m *SnippetMutation) GroupIDCleared() bool {
+	_, ok := m.clearedFields[snippet.FieldGroupID]
+	return ok
+}
+
+// ResetGroupID resets all changes to the "group_id" field.
+func (m *SnippetMutation) ResetGroupID() {
+	m.group = nil
+	delete(m.clearedFields, snippet.FieldGroupID)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *SnippetMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *SnippetMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the Snippet entity.
+// If the Snippet object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SnippetMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *SnippetMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *SnippetMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *SnippetMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the Snippet entity.
+// If the Snippet object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SnippetMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *SnippetMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// ClearGroup clears the "group" edge to the Group entity.
+func (m *SnippetMutation) ClearGroup() {
+	m.clearedgroup = true
+	m.clearedFields[snippet.FieldGroupID] = struct{}{}
+}
+
+// GroupCleared reports if the "group" edge to the Group entity was cleared.
+func (m *SnippetMutation) GroupCleared() bool {
+	return m.GroupIDCleared() || m.clearedgroup
+}
+
+// GroupIDs returns the "group" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// GroupID instead. It exists only for internal usage by the builders.
+func (m *SnippetMutation) GroupIDs() (ids []int64) {
+	if id := m.group; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetGroup resets all changes to the "group" edge.
+func (m *SnippetMutation) ResetGroup() {
+	m.group = nil
+	m.clearedgroup = false
+}
+
+// AddTagIDs adds the "tags" edge to the Tag entity by ids.
+func (m *SnippetMutation) AddTagIDs(ids ...int64) {
+	if m.tags == nil {
+		m.tags = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.tags[ids[i]] = struct{}{}
+	}
+}
+
+// ClearTags clears the "tags" edge to the Tag entity.
+func (m *SnippetMutation) ClearTags() {
+	m.clearedtags = true
+}
+
+// TagsCleared reports if the "tags" edge to the Tag entity was cleared.
+func (m *SnippetMutation) TagsCleared() bool {
+	return m.clearedtags
+}
+
+// RemoveTagIDs removes the "tags" edge to the Tag entity by IDs.
+func (m *SnippetMutation) RemoveTagIDs(ids ...int64) {
+	if m.removedtags == nil {
+		m.removedtags = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.tags, ids[i])
+		m.removedtags[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedTags returns the removed IDs of the "tags" edge to the Tag entity.
+func (m *SnippetMutation) RemovedTagsIDs() (ids []int64) {
+	for id := range m.removedtags {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// TagsIDs returns the "tags" edge IDs in the mutation.
+func (m *SnippetMutation) TagsIDs() (ids []int64) {
+	for id := range m.tags {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetTags resets all changes to the "tags" edge.
+func (m *SnippetMutation) ResetTags() {
+	m.tags = nil
+	m.clearedtags = false
+	m.removedtags = nil
+}
+
+// Where appends a list predicates to the SnippetMutation builder.
+func (m *SnippetMutation) Where(ps ...predicate.Snippet) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the SnippetMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *SnippetMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.Snippet, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *SnippetMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *SnippetMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (Snippet).
+func (m *SnippetMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *SnippetMutation) Fields() []string {
+	fields := make([]string, 0, 12)
+	if m.owner_id != nil {
+		fields = append(fields, snippet.FieldOwnerID)
+	}
+	if m._type != nil {
+		fields = append(fields, snippet.FieldType)
+	}
+	if m.title != nil {
+		fields = append(fields, snippet.FieldTitle)
+	}
+	if m.content != nil {
+		fields = append(fields, snippet.FieldContent)
+	}
+	if m.file_url != nil {
+		fields = append(fields, snippet.FieldFileURL)
+	}
+	if m.file_size != nil {
+		fields = append(fields, snippet.FieldFileSize)
+	}
+	if m.mime_type != nil {
+		fields = append(fields, snippet.FieldMimeType)
+	}
+	if m.language != nil {
+		fields = append(fields, snippet.FieldLanguage)
+	}
+	if m.visibility != nil {
+		fields = append(fields, snippet.FieldVisibility)
+	}
+	if m.group != nil {
+		fields = append(fields, snippet.FieldGroupID)
+	}
+	if m.created_at != nil {
+		fields = append(fields, snippet.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, snippet.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *SnippetMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case snippet.FieldOwnerID:
+		return m.OwnerID()
+	case snippet.FieldType:
+		return m.GetType()
+	case snippet.FieldTitle:
+		return m.Title()
+	case snippet.FieldContent:
+		return m.Content()
+	case snippet.FieldFileURL:
+		return m.FileURL()
+	case snippet.FieldFileSize:
+		return m.FileSize()
+	case snippet.FieldMimeType:
+		return m.MimeType()
+	case snippet.FieldLanguage:
+		return m.Language()
+	case snippet.FieldVisibility:
+		return m.Visibility()
+	case snippet.FieldGroupID:
+		return m.GroupID()
+	case snippet.FieldCreatedAt:
+		return m.CreatedAt()
+	case snippet.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *SnippetMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case snippet.FieldOwnerID:
+		return m.OldOwnerID(ctx)
+	case snippet.FieldType:
+		return m.OldType(ctx)
+	case snippet.FieldTitle:
+		return m.OldTitle(ctx)
+	case snippet.FieldContent:
+		return m.OldContent(ctx)
+	case snippet.FieldFileURL:
+		return m.OldFileURL(ctx)
+	case snippet.FieldFileSize:
+		return m.OldFileSize(ctx)
+	case snippet.FieldMimeType:
+		return m.OldMimeType(ctx)
+	case snippet.FieldLanguage:
+		return m.OldLanguage(ctx)
+	case snippet.FieldVisibility:
+		return m.OldVisibility(ctx)
+	case snippet.FieldGroupID:
+		return m.OldGroupID(ctx)
+	case snippet.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case snippet.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown Snippet field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *SnippetMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case snippet.FieldOwnerID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOwnerID(v)
+		return nil
+	case snippet.FieldType:
+		v, ok := value.(snippet.Type)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetType(v)
+		return nil
+	case snippet.FieldTitle:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTitle(v)
+		return nil
+	case snippet.FieldContent:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetContent(v)
+		return nil
+	case snippet.FieldFileURL:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFileURL(v)
+		return nil
+	case snippet.FieldFileSize:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFileSize(v)
+		return nil
+	case snippet.FieldMimeType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMimeType(v)
+		return nil
+	case snippet.FieldLanguage:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLanguage(v)
+		return nil
+	case snippet.FieldVisibility:
+		v, ok := value.(snippet.Visibility)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVisibility(v)
+		return nil
+	case snippet.FieldGroupID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetGroupID(v)
+		return nil
+	case snippet.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case snippet.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown Snippet field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *SnippetMutation) AddedFields() []string {
+	var fields []string
+	if m.addowner_id != nil {
+		fields = append(fields, snippet.FieldOwnerID)
+	}
+	if m.addfile_size != nil {
+		fields = append(fields, snippet.FieldFileSize)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *SnippetMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case snippet.FieldOwnerID:
+		return m.AddedOwnerID()
+	case snippet.FieldFileSize:
+		return m.AddedFileSize()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *SnippetMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case snippet.FieldOwnerID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddOwnerID(v)
+		return nil
+	case snippet.FieldFileSize:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddFileSize(v)
+		return nil
+	}
+	return fmt.Errorf("unknown Snippet numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *SnippetMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(snippet.FieldContent) {
+		fields = append(fields, snippet.FieldContent)
+	}
+	if m.FieldCleared(snippet.FieldFileURL) {
+		fields = append(fields, snippet.FieldFileURL)
+	}
+	if m.FieldCleared(snippet.FieldFileSize) {
+		fields = append(fields, snippet.FieldFileSize)
+	}
+	if m.FieldCleared(snippet.FieldMimeType) {
+		fields = append(fields, snippet.FieldMimeType)
+	}
+	if m.FieldCleared(snippet.FieldGroupID) {
+		fields = append(fields, snippet.FieldGroupID)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *SnippetMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *SnippetMutation) ClearField(name string) error {
+	switch name {
+	case snippet.FieldContent:
+		m.ClearContent()
+		return nil
+	case snippet.FieldFileURL:
+		m.ClearFileURL()
+		return nil
+	case snippet.FieldFileSize:
+		m.ClearFileSize()
+		return nil
+	case snippet.FieldMimeType:
+		m.ClearMimeType()
+		return nil
+	case snippet.FieldGroupID:
+		m.ClearGroupID()
+		return nil
+	}
+	return fmt.Errorf("unknown Snippet nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *SnippetMutation) ResetField(name string) error {
+	switch name {
+	case snippet.FieldOwnerID:
+		m.ResetOwnerID()
+		return nil
+	case snippet.FieldType:
+		m.ResetType()
+		return nil
+	case snippet.FieldTitle:
+		m.ResetTitle()
+		return nil
+	case snippet.FieldContent:
+		m.ResetContent()
+		return nil
+	case snippet.FieldFileURL:
+		m.ResetFileURL()
+		return nil
+	case snippet.FieldFileSize:
+		m.ResetFileSize()
+		return nil
+	case snippet.FieldMimeType:
+		m.ResetMimeType()
+		return nil
+	case snippet.FieldLanguage:
+		m.ResetLanguage()
+		return nil
+	case snippet.FieldVisibility:
+		m.ResetVisibility()
+		return nil
+	case snippet.FieldGroupID:
+		m.ResetGroupID()
+		return nil
+	case snippet.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case snippet.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown Snippet field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *SnippetMutation) AddedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.group != nil {
+		edges = append(edges, snippet.EdgeGroup)
+	}
+	if m.tags != nil {
+		edges = append(edges, snippet.EdgeTags)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *SnippetMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case snippet.EdgeGroup:
+		if id := m.group; id != nil {
+			return []ent.Value{*id}
+		}
+	case snippet.EdgeTags:
+		ids := make([]ent.Value, 0, len(m.tags))
+		for id := range m.tags {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *SnippetMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.removedtags != nil {
+		edges = append(edges, snippet.EdgeTags)
+	}
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *SnippetMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case snippet.EdgeTags:
+		ids := make([]ent.Value, 0, len(m.removedtags))
+		for id := range m.removedtags {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *SnippetMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.clearedgroup {
+		edges = append(edges, snippet.EdgeGroup)
+	}
+	if m.clearedtags {
+		edges = append(edges, snippet.EdgeTags)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *SnippetMutation) EdgeCleared(name string) bool {
+	switch name {
+	case snippet.EdgeGroup:
+		return m.clearedgroup
+	case snippet.EdgeTags:
+		return m.clearedtags
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *SnippetMutation) ClearEdge(name string) error {
+	switch name {
+	case snippet.EdgeGroup:
+		m.ClearGroup()
+		return nil
+	}
+	return fmt.Errorf("unknown Snippet unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *SnippetMutation) ResetEdge(name string) error {
+	switch name {
+	case snippet.EdgeGroup:
+		m.ResetGroup()
+		return nil
+	case snippet.EdgeTags:
+		m.ResetTags()
+		return nil
+	}
+	return fmt.Errorf("unknown Snippet edge %s", name)
+}
+
+// TagMutation represents an operation that mutates the Tag nodes in the graph.
+type TagMutation struct {
+	config
+	op              Op
+	typ             string
+	id              *int64
+	owner_id        *int64
+	addowner_id     *int64
+	name            *string
+	color           *string
+	created_at      *time.Time
+	clearedFields   map[string]struct{}
+	snippets        map[int64]struct{}
+	removedsnippets map[int64]struct{}
+	clearedsnippets bool
+	done            bool
+	oldValue        func(context.Context) (*Tag, error)
+	predicates      []predicate.Tag
+}
+
+var _ ent.Mutation = (*TagMutation)(nil)
+
+// tagOption allows management of the mutation configuration using functional options.
+type tagOption func(*TagMutation)
+
+// newTagMutation creates new mutation for the Tag entity.
+func newTagMutation(c config, op Op, opts ...tagOption) *TagMutation {
+	m := &TagMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeTag,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withTagID sets the ID field of the mutation.
+func withTagID(id int64) tagOption {
+	return func(m *TagMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *Tag
+		)
+		m.oldValue = func(ctx context.Context) (*Tag, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().Tag.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withTag sets the old Tag of the mutation.
+func withTag(node *Tag) tagOption {
+	return func(m *TagMutation) {
+		m.oldValue = func(context.Context) (*Tag, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m TagMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m TagMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of Tag entities.
+func (m *TagMutation) SetID(id int64) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *TagMutation) ID() (id int64, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *TagMutation) IDs(ctx context.Context) ([]int64, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int64{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().Tag.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetOwnerID sets the "owner_id" field.
+func (m *TagMutation) SetOwnerID(i int64) {
+	m.owner_id = &i
+	m.addowner_id = nil
+}
+
+// OwnerID returns the value of the "owner_id" field in the mutation.
+func (m *TagMutation) OwnerID() (r int64, exists bool) {
+	v := m.owner_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOwnerID returns the old "owner_id" field's value of the Tag entity.
+// If the Tag object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TagMutation) OldOwnerID(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOwnerID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOwnerID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOwnerID: %w", err)
+	}
+	return oldValue.OwnerID, nil
+}
+
+// AddOwnerID adds i to the "owner_id" field.
+func (m *TagMutation) AddOwnerID(i int64) {
+	if m.addowner_id != nil {
+		*m.addowner_id += i
+	} else {
+		m.addowner_id = &i
+	}
+}
+
+// AddedOwnerID returns the value that was added to the "owner_id" field in this mutation.
+func (m *TagMutation) AddedOwnerID() (r int64, exists bool) {
+	v := m.addowner_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetOwnerID resets all changes to the "owner_id" field.
+func (m *TagMutation) ResetOwnerID() {
+	m.owner_id = nil
+	m.addowner_id = nil
+}
+
+// SetName sets the "name" field.
+func (m *TagMutation) SetName(s string) {
+	m.name = &s
+}
+
+// Name returns the value of the "name" field in the mutation.
+func (m *TagMutation) Name() (r string, exists bool) {
+	v := m.name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldName returns the old "name" field's value of the Tag entity.
+// If the Tag object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TagMutation) OldName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldName: %w", err)
+	}
+	return oldValue.Name, nil
+}
+
+// ResetName resets all changes to the "name" field.
+func (m *TagMutation) ResetName() {
+	m.name = nil
+}
+
+// SetColor sets the "color" field.
+func (m *TagMutation) SetColor(s string) {
+	m.color = &s
+}
+
+// Color returns the value of the "color" field in the mutation.
+func (m *TagMutation) Color() (r string, exists bool) {
+	v := m.color
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldColor returns the old "color" field's value of the Tag entity.
+// If the Tag object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TagMutation) OldColor(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldColor is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldColor requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldColor: %w", err)
+	}
+	return oldValue.Color, nil
+}
+
+// ClearColor clears the value of the "color" field.
+func (m *TagMutation) ClearColor() {
+	m.color = nil
+	m.clearedFields[tag.FieldColor] = struct{}{}
+}
+
+// ColorCleared returns if the "color" field was cleared in this mutation.
+func (m *TagMutation) ColorCleared() bool {
+	_, ok := m.clearedFields[tag.FieldColor]
+	return ok
+}
+
+// ResetColor resets all changes to the "color" field.
+func (m *TagMutation) ResetColor() {
+	m.color = nil
+	delete(m.clearedFields, tag.FieldColor)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *TagMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *TagMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the Tag entity.
+// If the Tag object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TagMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *TagMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// AddSnippetIDs adds the "snippets" edge to the Snippet entity by ids.
+func (m *TagMutation) AddSnippetIDs(ids ...int64) {
+	if m.snippets == nil {
+		m.snippets = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.snippets[ids[i]] = struct{}{}
+	}
+}
+
+// ClearSnippets clears the "snippets" edge to the Snippet entity.
+func (m *TagMutation) ClearSnippets() {
+	m.clearedsnippets = true
+}
+
+// SnippetsCleared reports if the "snippets" edge to the Snippet entity was cleared.
+func (m *TagMutation) SnippetsCleared() bool {
+	return m.clearedsnippets
+}
+
+// RemoveSnippetIDs removes the "snippets" edge to the Snippet entity by IDs.
+func (m *TagMutation) RemoveSnippetIDs(ids ...int64) {
+	if m.removedsnippets == nil {
+		m.removedsnippets = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.snippets, ids[i])
+		m.removedsnippets[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedSnippets returns the removed IDs of the "snippets" edge to the Snippet entity.
+func (m *TagMutation) RemovedSnippetsIDs() (ids []int64) {
+	for id := range m.removedsnippets {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// SnippetsIDs returns the "snippets" edge IDs in the mutation.
+func (m *TagMutation) SnippetsIDs() (ids []int64) {
+	for id := range m.snippets {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetSnippets resets all changes to the "snippets" edge.
+func (m *TagMutation) ResetSnippets() {
+	m.snippets = nil
+	m.clearedsnippets = false
+	m.removedsnippets = nil
+}
+
+// Where appends a list predicates to the TagMutation builder.
+func (m *TagMutation) Where(ps ...predicate.Tag) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the TagMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *TagMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.Tag, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *TagMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *TagMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (Tag).
+func (m *TagMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *TagMutation) Fields() []string {
+	fields := make([]string, 0, 4)
+	if m.owner_id != nil {
+		fields = append(fields, tag.FieldOwnerID)
+	}
+	if m.name != nil {
+		fields = append(fields, tag.FieldName)
+	}
+	if m.color != nil {
+		fields = append(fields, tag.FieldColor)
+	}
+	if m.created_at != nil {
+		fields = append(fields, tag.FieldCreatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *TagMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case tag.FieldOwnerID:
+		return m.OwnerID()
+	case tag.FieldName:
+		return m.Name()
+	case tag.FieldColor:
+		return m.Color()
+	case tag.FieldCreatedAt:
+		return m.CreatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *TagMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case tag.FieldOwnerID:
+		return m.OldOwnerID(ctx)
+	case tag.FieldName:
+		return m.OldName(ctx)
+	case tag.FieldColor:
+		return m.OldColor(ctx)
+	case tag.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown Tag field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *TagMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case tag.FieldOwnerID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOwnerID(v)
+		return nil
+	case tag.FieldName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetName(v)
+		return nil
+	case tag.FieldColor:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetColor(v)
+		return nil
+	case tag.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown Tag field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *TagMutation) AddedFields() []string {
+	var fields []string
+	if m.addowner_id != nil {
+		fields = append(fields, tag.FieldOwnerID)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *TagMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case tag.FieldOwnerID:
 		return m.AddedOwnerID()
 	}
 	return nil, false
@@ -674,9 +2474,9 @@ func (m *PasteMutation) AddedField(name string) (ent.Value, bool) {
 // AddField adds the value to the field with the given name. It returns an error if
 // the field is not defined in the schema, or if the type mismatched the field
 // type.
-func (m *PasteMutation) AddField(name string, value ent.Value) error {
+func (m *TagMutation) AddField(name string, value ent.Value) error {
 	switch name {
-	case paste.FieldOwnerID:
+	case tag.FieldOwnerID:
 		v, ok := value.(int64)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
@@ -684,113 +2484,137 @@ func (m *PasteMutation) AddField(name string, value ent.Value) error {
 		m.AddOwnerID(v)
 		return nil
 	}
-	return fmt.Errorf("unknown Paste numeric field %s", name)
+	return fmt.Errorf("unknown Tag numeric field %s", name)
 }
 
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
-func (m *PasteMutation) ClearedFields() []string {
+func (m *TagMutation) ClearedFields() []string {
 	var fields []string
-	if m.FieldCleared(paste.FieldShortLink) {
-		fields = append(fields, paste.FieldShortLink)
+	if m.FieldCleared(tag.FieldColor) {
+		fields = append(fields, tag.FieldColor)
 	}
 	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
 // cleared in this mutation.
-func (m *PasteMutation) FieldCleared(name string) bool {
+func (m *TagMutation) FieldCleared(name string) bool {
 	_, ok := m.clearedFields[name]
 	return ok
 }
 
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
-func (m *PasteMutation) ClearField(name string) error {
+func (m *TagMutation) ClearField(name string) error {
 	switch name {
-	case paste.FieldShortLink:
-		m.ClearShortLink()
+	case tag.FieldColor:
+		m.ClearColor()
 		return nil
 	}
-	return fmt.Errorf("unknown Paste nullable field %s", name)
+	return fmt.Errorf("unknown Tag nullable field %s", name)
 }
 
 // ResetField resets all changes in the mutation for the field with the given name.
 // It returns an error if the field is not defined in the schema.
-func (m *PasteMutation) ResetField(name string) error {
+func (m *TagMutation) ResetField(name string) error {
 	switch name {
-	case paste.FieldOwnerID:
+	case tag.FieldOwnerID:
 		m.ResetOwnerID()
 		return nil
-	case paste.FieldTitle:
-		m.ResetTitle()
+	case tag.FieldName:
+		m.ResetName()
 		return nil
-	case paste.FieldShortLink:
-		m.ResetShortLink()
+	case tag.FieldColor:
+		m.ResetColor()
 		return nil
-	case paste.FieldContent:
-		m.ResetContent()
-		return nil
-	case paste.FieldLanguage:
-		m.ResetLanguage()
-		return nil
-	case paste.FieldVisibility:
-		m.ResetVisibility()
-		return nil
-	case paste.FieldCreatedAt:
+	case tag.FieldCreatedAt:
 		m.ResetCreatedAt()
 		return nil
-	case paste.FieldUpdatedAt:
-		m.ResetUpdatedAt()
-		return nil
 	}
-	return fmt.Errorf("unknown Paste field %s", name)
+	return fmt.Errorf("unknown Tag field %s", name)
 }
 
 // AddedEdges returns all edge names that were set/added in this mutation.
-func (m *PasteMutation) AddedEdges() []string {
-	edges := make([]string, 0, 0)
+func (m *TagMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.snippets != nil {
+		edges = append(edges, tag.EdgeSnippets)
+	}
 	return edges
 }
 
 // AddedIDs returns all IDs (to other nodes) that were added for the given edge
 // name in this mutation.
-func (m *PasteMutation) AddedIDs(name string) []ent.Value {
+func (m *TagMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case tag.EdgeSnippets:
+		ids := make([]ent.Value, 0, len(m.snippets))
+		for id := range m.snippets {
+			ids = append(ids, id)
+		}
+		return ids
+	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
-func (m *PasteMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 0)
+func (m *TagMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.removedsnippets != nil {
+		edges = append(edges, tag.EdgeSnippets)
+	}
 	return edges
 }
 
 // RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
 // the given name in this mutation.
-func (m *PasteMutation) RemovedIDs(name string) []ent.Value {
+func (m *TagMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case tag.EdgeSnippets:
+		ids := make([]ent.Value, 0, len(m.removedsnippets))
+		for id := range m.removedsnippets {
+			ids = append(ids, id)
+		}
+		return ids
+	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
-func (m *PasteMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 0)
+func (m *TagMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedsnippets {
+		edges = append(edges, tag.EdgeSnippets)
+	}
 	return edges
 }
 
 // EdgeCleared returns a boolean which indicates if the edge with the given name
 // was cleared in this mutation.
-func (m *PasteMutation) EdgeCleared(name string) bool {
+func (m *TagMutation) EdgeCleared(name string) bool {
+	switch name {
+	case tag.EdgeSnippets:
+		return m.clearedsnippets
+	}
 	return false
 }
 
 // ClearEdge clears the value of the edge with the given name. It returns an error
 // if that edge is not defined in the schema.
-func (m *PasteMutation) ClearEdge(name string) error {
-	return fmt.Errorf("unknown Paste unique edge %s", name)
+func (m *TagMutation) ClearEdge(name string) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown Tag unique edge %s", name)
 }
 
 // ResetEdge resets all changes to the edge with the given name in this mutation.
 // It returns an error if the edge is not defined in the schema.
-func (m *PasteMutation) ResetEdge(name string) error {
-	return fmt.Errorf("unknown Paste edge %s", name)
+func (m *TagMutation) ResetEdge(name string) error {
+	switch name {
+	case tag.EdgeSnippets:
+		m.ResetSnippets()
+		return nil
+	}
+	return fmt.Errorf("unknown Tag edge %s", name)
 }

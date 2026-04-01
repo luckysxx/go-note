@@ -6,5 +6,11 @@ import (
 	"entgo.io/ent/dialect/sql"
 )
 
-// Paste is the predicate function for paste builders.
-type Paste func(*sql.Selector)
+// Group is the predicate function for group builders.
+type Group func(*sql.Selector)
+
+// Snippet is the predicate function for snippet builders.
+type Snippet func(*sql.Selector)
+
+// Tag is the predicate function for tag builders.
+type Tag func(*sql.Selector)

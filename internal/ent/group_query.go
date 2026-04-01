@@ -4,6 +4,7 @@ package ent
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"math"
 
@@ -11,68 +12,92 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/luckysxx/go-note/internal/ent/paste"
+	"github.com/luckysxx/go-note/internal/ent/group"
 	"github.com/luckysxx/go-note/internal/ent/predicate"
+	"github.com/luckysxx/go-note/internal/ent/snippet"
 )
 
-// PasteQuery is the builder for querying Paste entities.
-type PasteQuery struct {
+// GroupQuery is the builder for querying Group entities.
+type GroupQuery struct {
 	config
-	ctx        *QueryContext
-	order      []paste.OrderOption
-	inters     []Interceptor
-	predicates []predicate.Paste
+	ctx          *QueryContext
+	order        []group.OrderOption
+	inters       []Interceptor
+	predicates   []predicate.Group
+	withSnippets *SnippetQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
 }
 
-// Where adds a new predicate for the PasteQuery builder.
-func (_q *PasteQuery) Where(ps ...predicate.Paste) *PasteQuery {
+// Where adds a new predicate for the GroupQuery builder.
+func (_q *GroupQuery) Where(ps ...predicate.Group) *GroupQuery {
 	_q.predicates = append(_q.predicates, ps...)
 	return _q
 }
 
 // Limit the number of records to be returned by this query.
-func (_q *PasteQuery) Limit(limit int) *PasteQuery {
+func (_q *GroupQuery) Limit(limit int) *GroupQuery {
 	_q.ctx.Limit = &limit
 	return _q
 }
 
 // Offset to start from.
-func (_q *PasteQuery) Offset(offset int) *PasteQuery {
+func (_q *GroupQuery) Offset(offset int) *GroupQuery {
 	_q.ctx.Offset = &offset
 	return _q
 }
 
 // Unique configures the query builder to filter duplicate records on query.
 // By default, unique is set to true, and can be disabled using this method.
-func (_q *PasteQuery) Unique(unique bool) *PasteQuery {
+func (_q *GroupQuery) Unique(unique bool) *GroupQuery {
 	_q.ctx.Unique = &unique
 	return _q
 }
 
 // Order specifies how the records should be ordered.
-func (_q *PasteQuery) Order(o ...paste.OrderOption) *PasteQuery {
+func (_q *GroupQuery) Order(o ...group.OrderOption) *GroupQuery {
 	_q.order = append(_q.order, o...)
 	return _q
 }
 
-// First returns the first Paste entity from the query.
-// Returns a *NotFoundError when no Paste was found.
-func (_q *PasteQuery) First(ctx context.Context) (*Paste, error) {
+// QuerySnippets chains the current query on the "snippets" edge.
+func (_q *GroupQuery) QuerySnippets() *SnippetQuery {
+	query := (&SnippetClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(group.Table, group.FieldID, selector),
+			sqlgraph.To(snippet.Table, snippet.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, group.SnippetsTable, group.SnippetsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// First returns the first Group entity from the query.
+// Returns a *NotFoundError when no Group was found.
+func (_q *GroupQuery) First(ctx context.Context) (*Group, error) {
 	nodes, err := _q.Limit(1).All(setContextOp(ctx, _q.ctx, ent.OpQueryFirst))
 	if err != nil {
 		return nil, err
 	}
 	if len(nodes) == 0 {
-		return nil, &NotFoundError{paste.Label}
+		return nil, &NotFoundError{group.Label}
 	}
 	return nodes[0], nil
 }
 
 // FirstX is like First, but panics if an error occurs.
-func (_q *PasteQuery) FirstX(ctx context.Context) *Paste {
+func (_q *GroupQuery) FirstX(ctx context.Context) *Group {
 	node, err := _q.First(ctx)
 	if err != nil && !IsNotFound(err) {
 		panic(err)
@@ -80,22 +105,22 @@ func (_q *PasteQuery) FirstX(ctx context.Context) *Paste {
 	return node
 }
 
-// FirstID returns the first Paste ID from the query.
-// Returns a *NotFoundError when no Paste ID was found.
-func (_q *PasteQuery) FirstID(ctx context.Context) (id int64, err error) {
+// FirstID returns the first Group ID from the query.
+// Returns a *NotFoundError when no Group ID was found.
+func (_q *GroupQuery) FirstID(ctx context.Context) (id int64, err error) {
 	var ids []int64
 	if ids, err = _q.Limit(1).IDs(setContextOp(ctx, _q.ctx, ent.OpQueryFirstID)); err != nil {
 		return
 	}
 	if len(ids) == 0 {
-		err = &NotFoundError{paste.Label}
+		err = &NotFoundError{group.Label}
 		return
 	}
 	return ids[0], nil
 }
 
 // FirstIDX is like FirstID, but panics if an error occurs.
-func (_q *PasteQuery) FirstIDX(ctx context.Context) int64 {
+func (_q *GroupQuery) FirstIDX(ctx context.Context) int64 {
 	id, err := _q.FirstID(ctx)
 	if err != nil && !IsNotFound(err) {
 		panic(err)
@@ -103,10 +128,10 @@ func (_q *PasteQuery) FirstIDX(ctx context.Context) int64 {
 	return id
 }
 
-// Only returns a single Paste entity found by the query, ensuring it only returns one.
-// Returns a *NotSingularError when more than one Paste entity is found.
-// Returns a *NotFoundError when no Paste entities are found.
-func (_q *PasteQuery) Only(ctx context.Context) (*Paste, error) {
+// Only returns a single Group entity found by the query, ensuring it only returns one.
+// Returns a *NotSingularError when more than one Group entity is found.
+// Returns a *NotFoundError when no Group entities are found.
+func (_q *GroupQuery) Only(ctx context.Context) (*Group, error) {
 	nodes, err := _q.Limit(2).All(setContextOp(ctx, _q.ctx, ent.OpQueryOnly))
 	if err != nil {
 		return nil, err
@@ -115,14 +140,14 @@ func (_q *PasteQuery) Only(ctx context.Context) (*Paste, error) {
 	case 1:
 		return nodes[0], nil
 	case 0:
-		return nil, &NotFoundError{paste.Label}
+		return nil, &NotFoundError{group.Label}
 	default:
-		return nil, &NotSingularError{paste.Label}
+		return nil, &NotSingularError{group.Label}
 	}
 }
 
 // OnlyX is like Only, but panics if an error occurs.
-func (_q *PasteQuery) OnlyX(ctx context.Context) *Paste {
+func (_q *GroupQuery) OnlyX(ctx context.Context) *Group {
 	node, err := _q.Only(ctx)
 	if err != nil {
 		panic(err)
@@ -130,10 +155,10 @@ func (_q *PasteQuery) OnlyX(ctx context.Context) *Paste {
 	return node
 }
 
-// OnlyID is like Only, but returns the only Paste ID in the query.
-// Returns a *NotSingularError when more than one Paste ID is found.
+// OnlyID is like Only, but returns the only Group ID in the query.
+// Returns a *NotSingularError when more than one Group ID is found.
 // Returns a *NotFoundError when no entities are found.
-func (_q *PasteQuery) OnlyID(ctx context.Context) (id int64, err error) {
+func (_q *GroupQuery) OnlyID(ctx context.Context) (id int64, err error) {
 	var ids []int64
 	if ids, err = _q.Limit(2).IDs(setContextOp(ctx, _q.ctx, ent.OpQueryOnlyID)); err != nil {
 		return
@@ -142,15 +167,15 @@ func (_q *PasteQuery) OnlyID(ctx context.Context) (id int64, err error) {
 	case 1:
 		id = ids[0]
 	case 0:
-		err = &NotFoundError{paste.Label}
+		err = &NotFoundError{group.Label}
 	default:
-		err = &NotSingularError{paste.Label}
+		err = &NotSingularError{group.Label}
 	}
 	return
 }
 
 // OnlyIDX is like OnlyID, but panics if an error occurs.
-func (_q *PasteQuery) OnlyIDX(ctx context.Context) int64 {
+func (_q *GroupQuery) OnlyIDX(ctx context.Context) int64 {
 	id, err := _q.OnlyID(ctx)
 	if err != nil {
 		panic(err)
@@ -158,18 +183,18 @@ func (_q *PasteQuery) OnlyIDX(ctx context.Context) int64 {
 	return id
 }
 
-// All executes the query and returns a list of Pastes.
-func (_q *PasteQuery) All(ctx context.Context) ([]*Paste, error) {
+// All executes the query and returns a list of Groups.
+func (_q *GroupQuery) All(ctx context.Context) ([]*Group, error) {
 	ctx = setContextOp(ctx, _q.ctx, ent.OpQueryAll)
 	if err := _q.prepareQuery(ctx); err != nil {
 		return nil, err
 	}
-	qr := querierAll[[]*Paste, *PasteQuery]()
-	return withInterceptors[[]*Paste](ctx, _q, qr, _q.inters)
+	qr := querierAll[[]*Group, *GroupQuery]()
+	return withInterceptors[[]*Group](ctx, _q, qr, _q.inters)
 }
 
 // AllX is like All, but panics if an error occurs.
-func (_q *PasteQuery) AllX(ctx context.Context) []*Paste {
+func (_q *GroupQuery) AllX(ctx context.Context) []*Group {
 	nodes, err := _q.All(ctx)
 	if err != nil {
 		panic(err)
@@ -177,20 +202,20 @@ func (_q *PasteQuery) AllX(ctx context.Context) []*Paste {
 	return nodes
 }
 
-// IDs executes the query and returns a list of Paste IDs.
-func (_q *PasteQuery) IDs(ctx context.Context) (ids []int64, err error) {
+// IDs executes the query and returns a list of Group IDs.
+func (_q *GroupQuery) IDs(ctx context.Context) (ids []int64, err error) {
 	if _q.ctx.Unique == nil && _q.path != nil {
 		_q.Unique(true)
 	}
 	ctx = setContextOp(ctx, _q.ctx, ent.OpQueryIDs)
-	if err = _q.Select(paste.FieldID).Scan(ctx, &ids); err != nil {
+	if err = _q.Select(group.FieldID).Scan(ctx, &ids); err != nil {
 		return nil, err
 	}
 	return ids, nil
 }
 
 // IDsX is like IDs, but panics if an error occurs.
-func (_q *PasteQuery) IDsX(ctx context.Context) []int64 {
+func (_q *GroupQuery) IDsX(ctx context.Context) []int64 {
 	ids, err := _q.IDs(ctx)
 	if err != nil {
 		panic(err)
@@ -199,16 +224,16 @@ func (_q *PasteQuery) IDsX(ctx context.Context) []int64 {
 }
 
 // Count returns the count of the given query.
-func (_q *PasteQuery) Count(ctx context.Context) (int, error) {
+func (_q *GroupQuery) Count(ctx context.Context) (int, error) {
 	ctx = setContextOp(ctx, _q.ctx, ent.OpQueryCount)
 	if err := _q.prepareQuery(ctx); err != nil {
 		return 0, err
 	}
-	return withInterceptors[int](ctx, _q, querierCount[*PasteQuery](), _q.inters)
+	return withInterceptors[int](ctx, _q, querierCount[*GroupQuery](), _q.inters)
 }
 
 // CountX is like Count, but panics if an error occurs.
-func (_q *PasteQuery) CountX(ctx context.Context) int {
+func (_q *GroupQuery) CountX(ctx context.Context) int {
 	count, err := _q.Count(ctx)
 	if err != nil {
 		panic(err)
@@ -217,7 +242,7 @@ func (_q *PasteQuery) CountX(ctx context.Context) int {
 }
 
 // Exist returns true if the query has elements in the graph.
-func (_q *PasteQuery) Exist(ctx context.Context) (bool, error) {
+func (_q *GroupQuery) Exist(ctx context.Context) (bool, error) {
 	ctx = setContextOp(ctx, _q.ctx, ent.OpQueryExist)
 	switch _, err := _q.FirstID(ctx); {
 	case IsNotFound(err):
@@ -230,7 +255,7 @@ func (_q *PasteQuery) Exist(ctx context.Context) (bool, error) {
 }
 
 // ExistX is like Exist, but panics if an error occurs.
-func (_q *PasteQuery) ExistX(ctx context.Context) bool {
+func (_q *GroupQuery) ExistX(ctx context.Context) bool {
 	exist, err := _q.Exist(ctx)
 	if err != nil {
 		panic(err)
@@ -238,22 +263,34 @@ func (_q *PasteQuery) ExistX(ctx context.Context) bool {
 	return exist
 }
 
-// Clone returns a duplicate of the PasteQuery builder, including all associated steps. It can be
+// Clone returns a duplicate of the GroupQuery builder, including all associated steps. It can be
 // used to prepare common query builders and use them differently after the clone is made.
-func (_q *PasteQuery) Clone() *PasteQuery {
+func (_q *GroupQuery) Clone() *GroupQuery {
 	if _q == nil {
 		return nil
 	}
-	return &PasteQuery{
-		config:     _q.config,
-		ctx:        _q.ctx.Clone(),
-		order:      append([]paste.OrderOption{}, _q.order...),
-		inters:     append([]Interceptor{}, _q.inters...),
-		predicates: append([]predicate.Paste{}, _q.predicates...),
+	return &GroupQuery{
+		config:       _q.config,
+		ctx:          _q.ctx.Clone(),
+		order:        append([]group.OrderOption{}, _q.order...),
+		inters:       append([]Interceptor{}, _q.inters...),
+		predicates:   append([]predicate.Group{}, _q.predicates...),
+		withSnippets: _q.withSnippets.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
 	}
+}
+
+// WithSnippets tells the query-builder to eager-load the nodes that are connected to
+// the "snippets" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *GroupQuery) WithSnippets(opts ...func(*SnippetQuery)) *GroupQuery {
+	query := (&SnippetClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withSnippets = query
+	return _q
 }
 
 // GroupBy is used to group vertices by one or more fields/columns.
@@ -266,15 +303,15 @@ func (_q *PasteQuery) Clone() *PasteQuery {
 //		Count int `json:"count,omitempty"`
 //	}
 //
-//	client.Paste.Query().
-//		GroupBy(paste.FieldOwnerID).
+//	client.Group.Query().
+//		GroupBy(group.FieldOwnerID).
 //		Aggregate(ent.Count()).
 //		Scan(ctx, &v)
-func (_q *PasteQuery) GroupBy(field string, fields ...string) *PasteGroupBy {
+func (_q *GroupQuery) GroupBy(field string, fields ...string) *GroupGroupBy {
 	_q.ctx.Fields = append([]string{field}, fields...)
-	grbuild := &PasteGroupBy{build: _q}
+	grbuild := &GroupGroupBy{build: _q}
 	grbuild.flds = &_q.ctx.Fields
-	grbuild.label = paste.Label
+	grbuild.label = group.Label
 	grbuild.scan = grbuild.Scan
 	return grbuild
 }
@@ -288,23 +325,23 @@ func (_q *PasteQuery) GroupBy(field string, fields ...string) *PasteGroupBy {
 //		OwnerID int64 `json:"owner_id,omitempty"`
 //	}
 //
-//	client.Paste.Query().
-//		Select(paste.FieldOwnerID).
+//	client.Group.Query().
+//		Select(group.FieldOwnerID).
 //		Scan(ctx, &v)
-func (_q *PasteQuery) Select(fields ...string) *PasteSelect {
+func (_q *GroupQuery) Select(fields ...string) *GroupSelect {
 	_q.ctx.Fields = append(_q.ctx.Fields, fields...)
-	sbuild := &PasteSelect{PasteQuery: _q}
-	sbuild.label = paste.Label
+	sbuild := &GroupSelect{GroupQuery: _q}
+	sbuild.label = group.Label
 	sbuild.flds, sbuild.scan = &_q.ctx.Fields, sbuild.Scan
 	return sbuild
 }
 
-// Aggregate returns a PasteSelect configured with the given aggregations.
-func (_q *PasteQuery) Aggregate(fns ...AggregateFunc) *PasteSelect {
+// Aggregate returns a GroupSelect configured with the given aggregations.
+func (_q *GroupQuery) Aggregate(fns ...AggregateFunc) *GroupSelect {
 	return _q.Select().Aggregate(fns...)
 }
 
-func (_q *PasteQuery) prepareQuery(ctx context.Context) error {
+func (_q *GroupQuery) prepareQuery(ctx context.Context) error {
 	for _, inter := range _q.inters {
 		if inter == nil {
 			return fmt.Errorf("ent: uninitialized interceptor (forgotten import ent/runtime?)")
@@ -316,7 +353,7 @@ func (_q *PasteQuery) prepareQuery(ctx context.Context) error {
 		}
 	}
 	for _, f := range _q.ctx.Fields {
-		if !paste.ValidColumn(f) {
+		if !group.ValidColumn(f) {
 			return &ValidationError{Name: f, err: fmt.Errorf("ent: invalid field %q for query", f)}
 		}
 	}
@@ -330,17 +367,21 @@ func (_q *PasteQuery) prepareQuery(ctx context.Context) error {
 	return nil
 }
 
-func (_q *PasteQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Paste, error) {
+func (_q *GroupQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Group, error) {
 	var (
-		nodes = []*Paste{}
-		_spec = _q.querySpec()
+		nodes       = []*Group{}
+		_spec       = _q.querySpec()
+		loadedTypes = [1]bool{
+			_q.withSnippets != nil,
+		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
-		return (*Paste).scanValues(nil, columns)
+		return (*Group).scanValues(nil, columns)
 	}
 	_spec.Assign = func(columns []string, values []any) error {
-		node := &Paste{config: _q.config}
+		node := &Group{config: _q.config}
 		nodes = append(nodes, node)
+		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
 	for i := range hooks {
@@ -352,10 +393,51 @@ func (_q *PasteQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Paste,
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
+	if query := _q.withSnippets; query != nil {
+		if err := _q.loadSnippets(ctx, query, nodes,
+			func(n *Group) { n.Edges.Snippets = []*Snippet{} },
+			func(n *Group, e *Snippet) { n.Edges.Snippets = append(n.Edges.Snippets, e) }); err != nil {
+			return nil, err
+		}
+	}
 	return nodes, nil
 }
 
-func (_q *PasteQuery) sqlCount(ctx context.Context) (int, error) {
+func (_q *GroupQuery) loadSnippets(ctx context.Context, query *SnippetQuery, nodes []*Group, init func(*Group), assign func(*Group, *Snippet)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int64]*Group)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(snippet.FieldGroupID)
+	}
+	query.Where(predicate.Snippet(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(group.SnippetsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.GroupID
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "group_id" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "group_id" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+
+func (_q *GroupQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := _q.querySpec()
 	_spec.Node.Columns = _q.ctx.Fields
 	if len(_q.ctx.Fields) > 0 {
@@ -364,8 +446,8 @@ func (_q *PasteQuery) sqlCount(ctx context.Context) (int, error) {
 	return sqlgraph.CountNodes(ctx, _q.driver, _spec)
 }
 
-func (_q *PasteQuery) querySpec() *sqlgraph.QuerySpec {
-	_spec := sqlgraph.NewQuerySpec(paste.Table, paste.Columns, sqlgraph.NewFieldSpec(paste.FieldID, field.TypeInt64))
+func (_q *GroupQuery) querySpec() *sqlgraph.QuerySpec {
+	_spec := sqlgraph.NewQuerySpec(group.Table, group.Columns, sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64))
 	_spec.From = _q.sql
 	if unique := _q.ctx.Unique; unique != nil {
 		_spec.Unique = *unique
@@ -374,9 +456,9 @@ func (_q *PasteQuery) querySpec() *sqlgraph.QuerySpec {
 	}
 	if fields := _q.ctx.Fields; len(fields) > 0 {
 		_spec.Node.Columns = make([]string, 0, len(fields))
-		_spec.Node.Columns = append(_spec.Node.Columns, paste.FieldID)
+		_spec.Node.Columns = append(_spec.Node.Columns, group.FieldID)
 		for i := range fields {
-			if fields[i] != paste.FieldID {
+			if fields[i] != group.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
 		}
@@ -404,12 +486,12 @@ func (_q *PasteQuery) querySpec() *sqlgraph.QuerySpec {
 	return _spec
 }
 
-func (_q *PasteQuery) sqlQuery(ctx context.Context) *sql.Selector {
+func (_q *GroupQuery) sqlQuery(ctx context.Context) *sql.Selector {
 	builder := sql.Dialect(_q.driver.Dialect())
-	t1 := builder.Table(paste.Table)
+	t1 := builder.Table(group.Table)
 	columns := _q.ctx.Fields
 	if len(columns) == 0 {
-		columns = paste.Columns
+		columns = group.Columns
 	}
 	selector := builder.Select(t1.Columns(columns...)...).From(t1)
 	if _q.sql != nil {
@@ -436,28 +518,28 @@ func (_q *PasteQuery) sqlQuery(ctx context.Context) *sql.Selector {
 	return selector
 }
 
-// PasteGroupBy is the group-by builder for Paste entities.
-type PasteGroupBy struct {
+// GroupGroupBy is the group-by builder for Group entities.
+type GroupGroupBy struct {
 	selector
-	build *PasteQuery
+	build *GroupQuery
 }
 
 // Aggregate adds the given aggregation functions to the group-by query.
-func (_g *PasteGroupBy) Aggregate(fns ...AggregateFunc) *PasteGroupBy {
+func (_g *GroupGroupBy) Aggregate(fns ...AggregateFunc) *GroupGroupBy {
 	_g.fns = append(_g.fns, fns...)
 	return _g
 }
 
 // Scan applies the selector query and scans the result into the given value.
-func (_g *PasteGroupBy) Scan(ctx context.Context, v any) error {
+func (_g *GroupGroupBy) Scan(ctx context.Context, v any) error {
 	ctx = setContextOp(ctx, _g.build.ctx, ent.OpQueryGroupBy)
 	if err := _g.build.prepareQuery(ctx); err != nil {
 		return err
 	}
-	return scanWithInterceptors[*PasteQuery, *PasteGroupBy](ctx, _g.build, _g, _g.build.inters, v)
+	return scanWithInterceptors[*GroupQuery, *GroupGroupBy](ctx, _g.build, _g, _g.build.inters, v)
 }
 
-func (_g *PasteGroupBy) sqlScan(ctx context.Context, root *PasteQuery, v any) error {
+func (_g *GroupGroupBy) sqlScan(ctx context.Context, root *GroupQuery, v any) error {
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -484,28 +566,28 @@ func (_g *PasteGroupBy) sqlScan(ctx context.Context, root *PasteQuery, v any) er
 	return sql.ScanSlice(rows, v)
 }
 
-// PasteSelect is the builder for selecting fields of Paste entities.
-type PasteSelect struct {
-	*PasteQuery
+// GroupSelect is the builder for selecting fields of Group entities.
+type GroupSelect struct {
+	*GroupQuery
 	selector
 }
 
 // Aggregate adds the given aggregation functions to the selector query.
-func (_s *PasteSelect) Aggregate(fns ...AggregateFunc) *PasteSelect {
+func (_s *GroupSelect) Aggregate(fns ...AggregateFunc) *GroupSelect {
 	_s.fns = append(_s.fns, fns...)
 	return _s
 }
 
 // Scan applies the selector query and scans the result into the given value.
-func (_s *PasteSelect) Scan(ctx context.Context, v any) error {
+func (_s *GroupSelect) Scan(ctx context.Context, v any) error {
 	ctx = setContextOp(ctx, _s.ctx, ent.OpQuerySelect)
 	if err := _s.prepareQuery(ctx); err != nil {
 		return err
 	}
-	return scanWithInterceptors[*PasteQuery, *PasteSelect](ctx, _s.PasteQuery, _s, _s.inters, v)
+	return scanWithInterceptors[*GroupQuery, *GroupSelect](ctx, _s.GroupQuery, _s, _s.inters, v)
 }
 
-func (_s *PasteSelect) sqlScan(ctx context.Context, root *PasteQuery, v any) error {
+func (_s *GroupSelect) sqlScan(ctx context.Context, root *GroupQuery, v any) error {
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {

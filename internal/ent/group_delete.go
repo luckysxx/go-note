@@ -8,30 +8,30 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/luckysxx/go-note/internal/ent/paste"
+	"github.com/luckysxx/go-note/internal/ent/group"
 	"github.com/luckysxx/go-note/internal/ent/predicate"
 )
 
-// PasteDelete is the builder for deleting a Paste entity.
-type PasteDelete struct {
+// GroupDelete is the builder for deleting a Group entity.
+type GroupDelete struct {
 	config
 	hooks    []Hook
-	mutation *PasteMutation
+	mutation *GroupMutation
 }
 
-// Where appends a list predicates to the PasteDelete builder.
-func (_d *PasteDelete) Where(ps ...predicate.Paste) *PasteDelete {
+// Where appends a list predicates to the GroupDelete builder.
+func (_d *GroupDelete) Where(ps ...predicate.Group) *GroupDelete {
 	_d.mutation.Where(ps...)
 	return _d
 }
 
 // Exec executes the deletion query and returns how many vertices were deleted.
-func (_d *PasteDelete) Exec(ctx context.Context) (int, error) {
+func (_d *GroupDelete) Exec(ctx context.Context) (int, error) {
 	return withHooks(ctx, _d.sqlExec, _d.mutation, _d.hooks)
 }
 
 // ExecX is like Exec, but panics if an error occurs.
-func (_d *PasteDelete) ExecX(ctx context.Context) int {
+func (_d *GroupDelete) ExecX(ctx context.Context) int {
 	n, err := _d.Exec(ctx)
 	if err != nil {
 		panic(err)
@@ -39,8 +39,8 @@ func (_d *PasteDelete) ExecX(ctx context.Context) int {
 	return n
 }
 
-func (_d *PasteDelete) sqlExec(ctx context.Context) (int, error) {
-	_spec := sqlgraph.NewDeleteSpec(paste.Table, sqlgraph.NewFieldSpec(paste.FieldID, field.TypeInt64))
+func (_d *GroupDelete) sqlExec(ctx context.Context) (int, error) {
+	_spec := sqlgraph.NewDeleteSpec(group.Table, sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64))
 	if ps := _d.mutation.predicates; len(ps) > 0 {
 		_spec.Predicate = func(selector *sql.Selector) {
 			for i := range ps {
@@ -56,32 +56,32 @@ func (_d *PasteDelete) sqlExec(ctx context.Context) (int, error) {
 	return affected, err
 }
 
-// PasteDeleteOne is the builder for deleting a single Paste entity.
-type PasteDeleteOne struct {
-	_d *PasteDelete
+// GroupDeleteOne is the builder for deleting a single Group entity.
+type GroupDeleteOne struct {
+	_d *GroupDelete
 }
 
-// Where appends a list predicates to the PasteDelete builder.
-func (_d *PasteDeleteOne) Where(ps ...predicate.Paste) *PasteDeleteOne {
+// Where appends a list predicates to the GroupDelete builder.
+func (_d *GroupDeleteOne) Where(ps ...predicate.Group) *GroupDeleteOne {
 	_d._d.mutation.Where(ps...)
 	return _d
 }
 
 // Exec executes the deletion query.
-func (_d *PasteDeleteOne) Exec(ctx context.Context) error {
+func (_d *GroupDeleteOne) Exec(ctx context.Context) error {
 	n, err := _d._d.Exec(ctx)
 	switch {
 	case err != nil:
 		return err
 	case n == 0:
-		return &NotFoundError{paste.Label}
+		return &NotFoundError{group.Label}
 	default:
 		return nil
 	}
 }
 
 // ExecX is like Exec, but panics if an error occurs.
-func (_d *PasteDeleteOne) ExecX(ctx context.Context) {
+func (_d *GroupDeleteOne) ExecX(ctx context.Context) {
 	if err := _d.Exec(ctx); err != nil {
 		panic(err)
 	}

@@ -19,8 +19,6 @@ func ConvertToCustomError(err error) *pkgerrs.CustomError {
 	}
 
 	switch {
-	case errors.Is(err, dberr.ErrShortLinkDuplicate):
-		return pkgerrs.NewParamErr("短链接已存在", err)
 	case errors.Is(err, dberr.ErrDuplicateKey):
 		return pkgerrs.NewParamErr("记录已存在", err)
 	case errors.Is(err, dberr.ErrNoRows):

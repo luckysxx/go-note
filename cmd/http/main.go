@@ -19,6 +19,7 @@ import (
 	"github.com/luckysxx/go-note/internal/ent"
 	"github.com/luckysxx/go-note/internal/platform/config"
 	"github.com/luckysxx/go-note/internal/platform/database"
+	platformidgen "github.com/luckysxx/go-note/internal/platform/idgen"
 	"github.com/luckysxx/go-note/internal/repository"
 	"github.com/luckysxx/go-note/internal/service"
 	"github.com/luckysxx/go-note/internal/transport/http/handler"
@@ -36,9 +37,10 @@ func main() {
 	cfg := config.LoadConfig()
 
 	// 1. 初始化底层基础设施
-	entClient, redisClient := initInfra(cfg, log)
+	entClient, redisClient, idgenClient := initInfra(cfg, log)
 	defer entClient.Close()
 	defer redisClient.Close()
+	defer idgenClient.Close()
 
 	// 2. 初始化 OpenTelemetry 链路追踪
 	otelShutdown, err := commonOtel.InitTracer(cfg.OTel.ServiceName, cfg.OTel.JaegerEndpoint)
@@ -48,49 +50,53 @@ func main() {
 	defer otelShutdown(context.Background())
 
 	// 3. 依赖注入与组件装配
-	router := buildRouter(cfg, entClient, redisClient, log)
+	router := buildRouter(cfg, entClient, redisClient, idgenClient, log)
 
 	// 4. 阻塞运行与优雅停机
 	runServer(router, cfg.Server.Port, log)
 }
 
 // initInfra 初始化基础设施
-func initInfra(cfg *config.Config, log *zap.Logger) (*ent.Client, *redis.Client) {
+func initInfra(cfg *config.Config, log *zap.Logger) (*ent.Client, *redis.Client, platformidgen.Client) {
 	entClient := database.InitEntClient(cfg.Database.Driver, cfg.Database.Source, cfg.Database.AutoMigrate, log)
 	redisClient := commonRedis.Init(commonRedis.Config{
 		Addr:     cfg.Redis.Addr,
 		Password: cfg.Redis.Password,
 		DB:       cfg.Redis.DB,
 	}, log)
+	idgenClient, err := platformidgen.New(cfg.IDGenerator.Addr)
+	if err != nil {
+		log.Fatal("初始化 id-generator 客户端失败", zap.Error(err))
+	}
 
-	return entClient, redisClient
+	return entClient, redisClient, idgenClient
 }
 
 // buildRouter 依赖注入装配
-func buildRouter(cfg *config.Config, entClient *ent.Client, redisClient *redis.Client, log *zap.Logger) *gin.Engine {
+func buildRouter(cfg *config.Config, entClient *ent.Client, redisClient *redis.Client, idgenClient platformidgen.Client, log *zap.Logger) *gin.Engine {
 	// Repository
-	pasteRepo := repository.NewPasteRepository(entClient)
+	snippetRepo := repository.NewSnippetRepository(entClient)
 
 	// Service
-	pasteSvc := service.NewPasteService(pasteRepo, log)
+	snippetSvc := service.NewSnippetService(snippetRepo, idgenClient, log)
 
 	// Transport
-	pasteHandler := handler.NewPasteHandler(pasteSvc, log)
+	snippetHandler := handler.NewSnippetHandler(snippetSvc, log)
 	r := gin.New()
 
 	// 健康检查（注册在业务中间件之前）
 	healthChecker := health.NewChecker()
 	healthChecker.AddCheck("postgres", func(ctx context.Context) error {
-		// 通过 Ent 执行一条轻量查询来验证数据库连接
-		var v []int
-		return entClient.Paste.Query().Limit(0).Select().Scan(ctx, &v)
+		// 用 count 探测数据库连接，避免 Scan 目标与列数不匹配。
+		_, err := entClient.Snippet.Query().Limit(1).Count(ctx)
+		return err
 	})
 	healthChecker.AddCheck("redis", func(ctx context.Context) error {
 		return redisClient.Ping(ctx).Err()
 	})
 	healthChecker.Register(r)
 
-	httprouter.SetupRouter(r, pasteHandler, log)
+	httprouter.SetupRouter(r, snippetHandler, log)
 
 	return r
 }

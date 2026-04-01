@@ -8,36 +8,147 @@ import (
 )
 
 var (
-	// PastesColumns holds the columns for the "pastes" table.
-	PastesColumns = []*schema.Column{
+	// GroupsColumns holds the columns for the "groups" table.
+	GroupsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt64, Increment: true},
 		{Name: "owner_id", Type: field.TypeInt64},
-		{Name: "title", Type: field.TypeString, Size: 120},
-		{Name: "short_link", Type: field.TypeString, Unique: true, Nullable: true, Size: 10},
-		{Name: "content", Type: field.TypeString, Size: 2147483647},
-		{Name: "language", Type: field.TypeString, Size: 20, Default: "text"},
-		{Name: "visibility", Type: field.TypeEnum, Enums: []string{"public", "private"}, Default: "private"},
+		{Name: "name", Type: field.TypeString, Size: 60},
+		{Name: "sort_order", Type: field.TypeInt, Default: 0},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 	}
-	// PastesTable holds the schema information for the "pastes" table.
-	PastesTable = &schema.Table{
-		Name:       "pastes",
-		Columns:    PastesColumns,
-		PrimaryKey: []*schema.Column{PastesColumns[0]},
+	// GroupsTable holds the schema information for the "groups" table.
+	GroupsTable = &schema.Table{
+		Name:       "groups",
+		Columns:    GroupsColumns,
+		PrimaryKey: []*schema.Column{GroupsColumns[0]},
 		Indexes: []*schema.Index{
 			{
-				Name:    "paste_owner_id",
+				Name:    "group_owner_id",
 				Unique:  false,
-				Columns: []*schema.Column{PastesColumns[1]},
+				Columns: []*schema.Column{GroupsColumns[1]},
+			},
+			{
+				Name:    "group_owner_id_name",
+				Unique:  true,
+				Columns: []*schema.Column{GroupsColumns[1], GroupsColumns[2]},
+			},
+		},
+	}
+	// SnippetsColumns holds the columns for the "snippets" table.
+	SnippetsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "owner_id", Type: field.TypeInt64},
+		{Name: "type", Type: field.TypeEnum, Enums: []string{"code", "note", "file"}, Default: "code"},
+		{Name: "title", Type: field.TypeString, Size: 200},
+		{Name: "content", Type: field.TypeString, Nullable: true, Size: 2147483647},
+		{Name: "file_url", Type: field.TypeString, Nullable: true, Size: 512},
+		{Name: "file_size", Type: field.TypeInt64, Nullable: true, Default: 0},
+		{Name: "mime_type", Type: field.TypeString, Nullable: true, Size: 100},
+		{Name: "language", Type: field.TypeString, Size: 30, Default: "text"},
+		{Name: "visibility", Type: field.TypeEnum, Enums: []string{"public", "private"}, Default: "private"},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "group_id", Type: field.TypeInt64, Nullable: true},
+	}
+	// SnippetsTable holds the schema information for the "snippets" table.
+	SnippetsTable = &schema.Table{
+		Name:       "snippets",
+		Columns:    SnippetsColumns,
+		PrimaryKey: []*schema.Column{SnippetsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "snippets_groups_snippets",
+				Columns:    []*schema.Column{SnippetsColumns[12]},
+				RefColumns: []*schema.Column{GroupsColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "snippet_owner_id",
+				Unique:  false,
+				Columns: []*schema.Column{SnippetsColumns[1]},
+			},
+			{
+				Name:    "snippet_owner_id_type",
+				Unique:  false,
+				Columns: []*schema.Column{SnippetsColumns[1], SnippetsColumns[2]},
+			},
+			{
+				Name:    "snippet_owner_id_group_id",
+				Unique:  false,
+				Columns: []*schema.Column{SnippetsColumns[1], SnippetsColumns[12]},
+			},
+			{
+				Name:    "snippet_visibility",
+				Unique:  false,
+				Columns: []*schema.Column{SnippetsColumns[9]},
+			},
+		},
+	}
+	// TagsColumns holds the columns for the "tags" table.
+	TagsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "owner_id", Type: field.TypeInt64},
+		{Name: "name", Type: field.TypeString, Size: 30},
+		{Name: "color", Type: field.TypeString, Nullable: true, Size: 7, Default: "#6366f1"},
+		{Name: "created_at", Type: field.TypeTime},
+	}
+	// TagsTable holds the schema information for the "tags" table.
+	TagsTable = &schema.Table{
+		Name:       "tags",
+		Columns:    TagsColumns,
+		PrimaryKey: []*schema.Column{TagsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "tag_owner_id",
+				Unique:  false,
+				Columns: []*schema.Column{TagsColumns[1]},
+			},
+			{
+				Name:    "tag_owner_id_name",
+				Unique:  true,
+				Columns: []*schema.Column{TagsColumns[1], TagsColumns[2]},
+			},
+		},
+	}
+	// SnippetTagsColumns holds the columns for the "snippet_tags" table.
+	SnippetTagsColumns = []*schema.Column{
+		{Name: "snippet_id", Type: field.TypeInt64},
+		{Name: "tag_id", Type: field.TypeInt64},
+	}
+	// SnippetTagsTable holds the schema information for the "snippet_tags" table.
+	SnippetTagsTable = &schema.Table{
+		Name:       "snippet_tags",
+		Columns:    SnippetTagsColumns,
+		PrimaryKey: []*schema.Column{SnippetTagsColumns[0], SnippetTagsColumns[1]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "snippet_tags_snippet_id",
+				Columns:    []*schema.Column{SnippetTagsColumns[0]},
+				RefColumns: []*schema.Column{SnippetsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+			{
+				Symbol:     "snippet_tags_tag_id",
+				Columns:    []*schema.Column{SnippetTagsColumns[1]},
+				RefColumns: []*schema.Column{TagsColumns[0]},
+				OnDelete:   schema.Cascade,
 			},
 		},
 	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
-		PastesTable,
+		GroupsTable,
+		SnippetsTable,
+		TagsTable,
+		SnippetTagsTable,
 	}
 )
 
 func init() {
+	SnippetsTable.ForeignKeys[0].RefTable = GroupsTable
+	SnippetTagsTable.ForeignKeys[0].RefTable = SnippetsTable
+	SnippetTagsTable.ForeignKeys[1].RefTable = TagsTable
 }
