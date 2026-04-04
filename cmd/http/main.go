@@ -12,7 +12,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/luckysxx/common/health"
+	"github.com/luckysxx/common/probe"
 	"github.com/luckysxx/common/logger"
 	commonOtel "github.com/luckysxx/common/otel"
 	commonRedis "github.com/luckysxx/common/redis"
@@ -43,7 +43,7 @@ func main() {
 	defer idgenClient.Close()
 
 	// 2. 初始化 OpenTelemetry 链路追踪
-	otelShutdown, err := commonOtel.InitTracer(cfg.OTel.ServiceName, cfg.OTel.JaegerEndpoint)
+	otelShutdown, err := commonOtel.InitTracer(cfg.OTel)
 	if err != nil {
 		log.Fatal("初始化 OpenTelemetry 失败", zap.Error(err))
 	}
@@ -59,11 +59,7 @@ func main() {
 // initInfra 初始化基础设施
 func initInfra(cfg *config.Config, log *zap.Logger) (*ent.Client, *redis.Client, platformidgen.Client) {
 	entClient := database.InitEntClient(cfg.Database.Driver, cfg.Database.Source, cfg.Database.AutoMigrate, log)
-	redisClient := commonRedis.Init(commonRedis.Config{
-		Addr:     cfg.Redis.Addr,
-		Password: cfg.Redis.Password,
-		DB:       cfg.Redis.DB,
-	}, log)
+	redisClient := commonRedis.Init(cfg.Redis, log)
 	idgenClient, err := platformidgen.New(cfg.IDGenerator.Addr)
 	if err != nil {
 		log.Fatal("初始化 id-generator 客户端失败", zap.Error(err))
@@ -84,17 +80,14 @@ func buildRouter(cfg *config.Config, entClient *ent.Client, redisClient *redis.C
 	snippetHandler := handler.NewSnippetHandler(snippetSvc, log)
 	r := gin.New()
 
-	// 健康检查（注册在业务中间件之前）
-	healthChecker := health.NewChecker()
-	healthChecker.AddCheck("postgres", func(ctx context.Context) error {
-		// 用 count 探测数据库连接，避免 Scan 目标与列数不匹配。
-		_, err := entClient.Snippet.Query().Limit(1).Count(ctx)
-		return err
-	})
-	healthChecker.AddCheck("redis", func(ctx context.Context) error {
-		return redisClient.Ping(ctx).Err()
-	})
-	healthChecker.Register(r)
+	// 探针端点：/healthz, /readyz, /metrics（注册在业务中间件之前）
+	probe.Register(r, log,
+		probe.WithCheck("postgres", func(ctx context.Context) error {
+			_, err := entClient.Snippet.Query().Limit(1).Count(ctx)
+			return err
+		}),
+		probe.WithRedis(redisClient),
+	)
 
 	httprouter.SetupRouter(r, snippetHandler, log)
 

@@ -2,7 +2,6 @@ package router
 
 import (
 	"github.com/luckysxx/common/logger"
-	"github.com/luckysxx/common/metrics"
 	"github.com/luckysxx/go-note/internal/transport/http/handler"
 	"github.com/luckysxx/go-note/internal/transport/http/middleware"
 
@@ -13,8 +12,6 @@ import (
 
 // SetupRouter 配置路由。
 func SetupRouter(r *gin.Engine, snippetHandler *handler.SnippetHandler, log *zap.Logger) {
-	r.GET("/metrics", metrics.GinMetricsHandler())
-	r.Use(metrics.GinMetrics())
 	r.Use(otelgin.Middleware("go-note"))
 	r.Use(logger.GinLogger(log))
 	r.Use(logger.GinRecovery(log, true))

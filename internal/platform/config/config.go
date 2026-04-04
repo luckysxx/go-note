@@ -2,6 +2,9 @@ package config
 
 import (
 	"github.com/luckysxx/common/conf"
+	commonOtel "github.com/luckysxx/common/otel"
+	"github.com/luckysxx/common/postgres"
+	commonRedis "github.com/luckysxx/common/redis"
 )
 
 // Config 全局配置
@@ -10,9 +13,9 @@ type Config struct {
 	Server      conf.ServerConfig   `mapstructure:"server"`
 	GRPCServer  GRPCServerConfig    `mapstructure:"grpc_server"`
 	IDGenerator IDGeneratorConfig   `mapstructure:"id_generator"`
-	Database    conf.DatabaseConfig `mapstructure:"database"`
-	Redis       conf.RedisConfig    `mapstructure:"redis"`
-	OTel        conf.OTelConfig     `mapstructure:"otel"`
+	Database    postgres.Config     `mapstructure:"database"`
+	Redis       commonRedis.Config  `mapstructure:"redis"`
+	OTel        commonOtel.Config   `mapstructure:"otel"`
 	Metrics     MetricsConfig       `mapstructure:"metrics"`
 }
 
