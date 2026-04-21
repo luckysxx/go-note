@@ -20,8 +20,12 @@ type Group struct {
 	ID int64 `json:"id,omitempty"`
 	// 分组拥有者的用户 ID
 	OwnerID int64 `json:"owner_id,omitempty"`
+	// 父分组 ID，nil 表示顶级分组
+	ParentID *int64 `json:"parent_id,omitempty"`
 	// 分组名称
 	Name string `json:"name,omitempty"`
+	// 分组描述
+	Description string `json:"description,omitempty"`
 	// 排序权重，值越小越靠前
 	SortOrder int `json:"sort_order,omitempty"`
 	// 创建时间
@@ -38,9 +42,13 @@ type Group struct {
 type GroupEdges struct {
 	// Snippets holds the value of the snippets edge.
 	Snippets []*Snippet `json:"snippets,omitempty"`
+	// Parent holds the value of the parent edge.
+	Parent *Group `json:"parent,omitempty"`
+	// Children holds the value of the children edge.
+	Children []*Group `json:"children,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [1]bool
+	loadedTypes [3]bool
 }
 
 // SnippetsOrErr returns the Snippets value or an error if the edge
@@ -52,14 +60,34 @@ func (e GroupEdges) SnippetsOrErr() ([]*Snippet, error) {
 	return nil, &NotLoadedError{edge: "snippets"}
 }
 
+// ParentOrErr returns the Parent value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e GroupEdges) ParentOrErr() (*Group, error) {
+	if e.Parent != nil {
+		return e.Parent, nil
+	} else if e.loadedTypes[1] {
+		return nil, &NotFoundError{label: group.Label}
+	}
+	return nil, &NotLoadedError{edge: "parent"}
+}
+
+// ChildrenOrErr returns the Children value or an error if the edge
+// was not loaded in eager-loading.
+func (e GroupEdges) ChildrenOrErr() ([]*Group, error) {
+	if e.loadedTypes[2] {
+		return e.Children, nil
+	}
+	return nil, &NotLoadedError{edge: "children"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*Group) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case group.FieldID, group.FieldOwnerID, group.FieldSortOrder:
+		case group.FieldID, group.FieldOwnerID, group.FieldParentID, group.FieldSortOrder:
 			values[i] = new(sql.NullInt64)
-		case group.FieldName:
+		case group.FieldName, group.FieldDescription:
 			values[i] = new(sql.NullString)
 		case group.FieldCreatedAt, group.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -90,11 +118,24 @@ func (_m *Group) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.OwnerID = value.Int64
 			}
+		case group.FieldParentID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field parent_id", values[i])
+			} else if value.Valid {
+				_m.ParentID = new(int64)
+				*_m.ParentID = value.Int64
+			}
 		case group.FieldName:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field name", values[i])
 			} else if value.Valid {
 				_m.Name = value.String
+			}
+		case group.FieldDescription:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field description", values[i])
+			} else if value.Valid {
+				_m.Description = value.String
 			}
 		case group.FieldSortOrder:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -132,6 +173,16 @@ func (_m *Group) QuerySnippets() *SnippetQuery {
 	return NewGroupClient(_m.config).QuerySnippets(_m)
 }
 
+// QueryParent queries the "parent" edge of the Group entity.
+func (_m *Group) QueryParent() *GroupQuery {
+	return NewGroupClient(_m.config).QueryParent(_m)
+}
+
+// QueryChildren queries the "children" edge of the Group entity.
+func (_m *Group) QueryChildren() *GroupQuery {
+	return NewGroupClient(_m.config).QueryChildren(_m)
+}
+
 // Update returns a builder for updating this Group.
 // Note that you need to call Group.Unwrap() before calling this method if this Group
 // was returned from a transaction, and the transaction was committed or rolled back.
@@ -158,8 +209,16 @@ func (_m *Group) String() string {
 	builder.WriteString("owner_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.OwnerID))
 	builder.WriteString(", ")
+	if v := _m.ParentID; v != nil {
+		builder.WriteString("parent_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
 	builder.WriteString("name=")
 	builder.WriteString(_m.Name)
+	builder.WriteString(", ")
+	builder.WriteString("description=")
+	builder.WriteString(_m.Description)
 	builder.WriteString(", ")
 	builder.WriteString("sort_order=")
 	builder.WriteString(fmt.Sprintf("%v", _m.SortOrder))

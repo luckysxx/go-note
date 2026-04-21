@@ -8,9 +8,11 @@ import (
 	"fmt"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/luckysxx/go-note/internal/ent/group"
+	"github.com/luckysxx/go-note/internal/ent/share"
 	"github.com/luckysxx/go-note/internal/ent/snippet"
 	"github.com/luckysxx/go-note/internal/ent/tag"
 )
@@ -20,6 +22,7 @@ type SnippetCreate struct {
 	config
 	mutation *SnippetMutation
 	hooks    []Hook
+	conflict []sql.ConflictOption
 }
 
 // SetOwnerID sets the "owner_id" field.
@@ -118,20 +121,6 @@ func (_c *SnippetCreate) SetNillableLanguage(v *string) *SnippetCreate {
 	return _c
 }
 
-// SetVisibility sets the "visibility" field.
-func (_c *SnippetCreate) SetVisibility(v snippet.Visibility) *SnippetCreate {
-	_c.mutation.SetVisibility(v)
-	return _c
-}
-
-// SetNillableVisibility sets the "visibility" field if the given value is not nil.
-func (_c *SnippetCreate) SetNillableVisibility(v *snippet.Visibility) *SnippetCreate {
-	if v != nil {
-		_c.SetVisibility(*v)
-	}
-	return _c
-}
-
 // SetGroupID sets the "group_id" field.
 func (_c *SnippetCreate) SetGroupID(v int64) *SnippetCreate {
 	_c.mutation.SetGroupID(v)
@@ -142,6 +131,48 @@ func (_c *SnippetCreate) SetGroupID(v int64) *SnippetCreate {
 func (_c *SnippetCreate) SetNillableGroupID(v *int64) *SnippetCreate {
 	if v != nil {
 		_c.SetGroupID(*v)
+	}
+	return _c
+}
+
+// SetSortOrder sets the "sort_order" field.
+func (_c *SnippetCreate) SetSortOrder(v int) *SnippetCreate {
+	_c.mutation.SetSortOrder(v)
+	return _c
+}
+
+// SetNillableSortOrder sets the "sort_order" field if the given value is not nil.
+func (_c *SnippetCreate) SetNillableSortOrder(v *int) *SnippetCreate {
+	if v != nil {
+		_c.SetSortOrder(*v)
+	}
+	return _c
+}
+
+// SetIsFavorite sets the "is_favorite" field.
+func (_c *SnippetCreate) SetIsFavorite(v bool) *SnippetCreate {
+	_c.mutation.SetIsFavorite(v)
+	return _c
+}
+
+// SetNillableIsFavorite sets the "is_favorite" field if the given value is not nil.
+func (_c *SnippetCreate) SetNillableIsFavorite(v *bool) *SnippetCreate {
+	if v != nil {
+		_c.SetIsFavorite(*v)
+	}
+	return _c
+}
+
+// SetDeletedAt sets the "deleted_at" field.
+func (_c *SnippetCreate) SetDeletedAt(v time.Time) *SnippetCreate {
+	_c.mutation.SetDeletedAt(v)
+	return _c
+}
+
+// SetNillableDeletedAt sets the "deleted_at" field if the given value is not nil.
+func (_c *SnippetCreate) SetNillableDeletedAt(v *time.Time) *SnippetCreate {
+	if v != nil {
+		_c.SetDeletedAt(*v)
 	}
 	return _c
 }
@@ -200,6 +231,21 @@ func (_c *SnippetCreate) AddTags(v ...*Tag) *SnippetCreate {
 	return _c.AddTagIDs(ids...)
 }
 
+// AddShareIDs adds the "shares" edge to the Share entity by IDs.
+func (_c *SnippetCreate) AddShareIDs(ids ...int64) *SnippetCreate {
+	_c.mutation.AddShareIDs(ids...)
+	return _c
+}
+
+// AddShares adds the "shares" edges to the Share entity.
+func (_c *SnippetCreate) AddShares(v ...*Share) *SnippetCreate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddShareIDs(ids...)
+}
+
 // Mutation returns the SnippetMutation object of the builder.
 func (_c *SnippetCreate) Mutation() *SnippetMutation {
 	return _c.mutation
@@ -247,9 +293,13 @@ func (_c *SnippetCreate) defaults() {
 		v := snippet.DefaultLanguage
 		_c.mutation.SetLanguage(v)
 	}
-	if _, ok := _c.mutation.Visibility(); !ok {
-		v := snippet.DefaultVisibility
-		_c.mutation.SetVisibility(v)
+	if _, ok := _c.mutation.SortOrder(); !ok {
+		v := snippet.DefaultSortOrder
+		_c.mutation.SetSortOrder(v)
+	}
+	if _, ok := _c.mutation.IsFavorite(); !ok {
+		v := snippet.DefaultIsFavorite
+		_c.mutation.SetIsFavorite(v)
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		v := snippet.DefaultCreatedAt()
@@ -305,13 +355,11 @@ func (_c *SnippetCreate) check() error {
 			return &ValidationError{Name: "language", err: fmt.Errorf(`ent: validator failed for field "Snippet.language": %w`, err)}
 		}
 	}
-	if _, ok := _c.mutation.Visibility(); !ok {
-		return &ValidationError{Name: "visibility", err: errors.New(`ent: missing required field "Snippet.visibility"`)}
+	if _, ok := _c.mutation.SortOrder(); !ok {
+		return &ValidationError{Name: "sort_order", err: errors.New(`ent: missing required field "Snippet.sort_order"`)}
 	}
-	if v, ok := _c.mutation.Visibility(); ok {
-		if err := snippet.VisibilityValidator(v); err != nil {
-			return &ValidationError{Name: "visibility", err: fmt.Errorf(`ent: validator failed for field "Snippet.visibility": %w`, err)}
-		}
+	if _, ok := _c.mutation.IsFavorite(); !ok {
+		return &ValidationError{Name: "is_favorite", err: errors.New(`ent: missing required field "Snippet.is_favorite"`)}
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "Snippet.created_at"`)}
@@ -347,6 +395,7 @@ func (_c *SnippetCreate) createSpec() (*Snippet, *sqlgraph.CreateSpec) {
 		_node = &Snippet{config: _c.config}
 		_spec = sqlgraph.NewCreateSpec(snippet.Table, sqlgraph.NewFieldSpec(snippet.FieldID, field.TypeInt64))
 	)
+	_spec.OnConflict = _c.conflict
 	if id, ok := _c.mutation.ID(); ok {
 		_node.ID = id
 		_spec.ID.Value = id
@@ -383,9 +432,17 @@ func (_c *SnippetCreate) createSpec() (*Snippet, *sqlgraph.CreateSpec) {
 		_spec.SetField(snippet.FieldLanguage, field.TypeString, value)
 		_node.Language = value
 	}
-	if value, ok := _c.mutation.Visibility(); ok {
-		_spec.SetField(snippet.FieldVisibility, field.TypeEnum, value)
-		_node.Visibility = value
+	if value, ok := _c.mutation.SortOrder(); ok {
+		_spec.SetField(snippet.FieldSortOrder, field.TypeInt, value)
+		_node.SortOrder = value
+	}
+	if value, ok := _c.mutation.IsFavorite(); ok {
+		_spec.SetField(snippet.FieldIsFavorite, field.TypeBool, value)
+		_node.IsFavorite = value
+	}
+	if value, ok := _c.mutation.DeletedAt(); ok {
+		_spec.SetField(snippet.FieldDeletedAt, field.TypeTime, value)
+		_node.DeletedAt = &value
 	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(snippet.FieldCreatedAt, field.TypeTime, value)
@@ -428,7 +485,611 @@ func (_c *SnippetCreate) createSpec() (*Snippet, *sqlgraph.CreateSpec) {
 		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
+	if nodes := _c.mutation.SharesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   snippet.SharesTable,
+			Columns: []string{snippet.SharesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(share.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
 	return _node, _spec
+}
+
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.Snippet.Create().
+//		SetOwnerID(v).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.SnippetUpsert) {
+//			SetOwnerID(v+v).
+//		}).
+//		Exec(ctx)
+func (_c *SnippetCreate) OnConflict(opts ...sql.ConflictOption) *SnippetUpsertOne {
+	_c.conflict = opts
+	return &SnippetUpsertOne{
+		create: _c,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.Snippet.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (_c *SnippetCreate) OnConflictColumns(columns ...string) *SnippetUpsertOne {
+	_c.conflict = append(_c.conflict, sql.ConflictColumns(columns...))
+	return &SnippetUpsertOne{
+		create: _c,
+	}
+}
+
+type (
+	// SnippetUpsertOne is the builder for "upsert"-ing
+	//  one Snippet node.
+	SnippetUpsertOne struct {
+		create *SnippetCreate
+	}
+
+	// SnippetUpsert is the "OnConflict" setter.
+	SnippetUpsert struct {
+		*sql.UpdateSet
+	}
+)
+
+// SetOwnerID sets the "owner_id" field.
+func (u *SnippetUpsert) SetOwnerID(v int64) *SnippetUpsert {
+	u.Set(snippet.FieldOwnerID, v)
+	return u
+}
+
+// UpdateOwnerID sets the "owner_id" field to the value that was provided on create.
+func (u *SnippetUpsert) UpdateOwnerID() *SnippetUpsert {
+	u.SetExcluded(snippet.FieldOwnerID)
+	return u
+}
+
+// AddOwnerID adds v to the "owner_id" field.
+func (u *SnippetUpsert) AddOwnerID(v int64) *SnippetUpsert {
+	u.Add(snippet.FieldOwnerID, v)
+	return u
+}
+
+// SetType sets the "type" field.
+func (u *SnippetUpsert) SetType(v snippet.Type) *SnippetUpsert {
+	u.Set(snippet.FieldType, v)
+	return u
+}
+
+// UpdateType sets the "type" field to the value that was provided on create.
+func (u *SnippetUpsert) UpdateType() *SnippetUpsert {
+	u.SetExcluded(snippet.FieldType)
+	return u
+}
+
+// SetTitle sets the "title" field.
+func (u *SnippetUpsert) SetTitle(v string) *SnippetUpsert {
+	u.Set(snippet.FieldTitle, v)
+	return u
+}
+
+// UpdateTitle sets the "title" field to the value that was provided on create.
+func (u *SnippetUpsert) UpdateTitle() *SnippetUpsert {
+	u.SetExcluded(snippet.FieldTitle)
+	return u
+}
+
+// SetContent sets the "content" field.
+func (u *SnippetUpsert) SetContent(v string) *SnippetUpsert {
+	u.Set(snippet.FieldContent, v)
+	return u
+}
+
+// UpdateContent sets the "content" field to the value that was provided on create.
+func (u *SnippetUpsert) UpdateContent() *SnippetUpsert {
+	u.SetExcluded(snippet.FieldContent)
+	return u
+}
+
+// ClearContent clears the value of the "content" field.
+func (u *SnippetUpsert) ClearContent() *SnippetUpsert {
+	u.SetNull(snippet.FieldContent)
+	return u
+}
+
+// SetFileURL sets the "file_url" field.
+func (u *SnippetUpsert) SetFileURL(v string) *SnippetUpsert {
+	u.Set(snippet.FieldFileURL, v)
+	return u
+}
+
+// UpdateFileURL sets the "file_url" field to the value that was provided on create.
+func (u *SnippetUpsert) UpdateFileURL() *SnippetUpsert {
+	u.SetExcluded(snippet.FieldFileURL)
+	return u
+}
+
+// ClearFileURL clears the value of the "file_url" field.
+func (u *SnippetUpsert) ClearFileURL() *SnippetUpsert {
+	u.SetNull(snippet.FieldFileURL)
+	return u
+}
+
+// SetFileSize sets the "file_size" field.
+func (u *SnippetUpsert) SetFileSize(v int64) *SnippetUpsert {
+	u.Set(snippet.FieldFileSize, v)
+	return u
+}
+
+// UpdateFileSize sets the "file_size" field to the value that was provided on create.
+func (u *SnippetUpsert) UpdateFileSize() *SnippetUpsert {
+	u.SetExcluded(snippet.FieldFileSize)
+	return u
+}
+
+// AddFileSize adds v to the "file_size" field.
+func (u *SnippetUpsert) AddFileSize(v int64) *SnippetUpsert {
+	u.Add(snippet.FieldFileSize, v)
+	return u
+}
+
+// ClearFileSize clears the value of the "file_size" field.
+func (u *SnippetUpsert) ClearFileSize() *SnippetUpsert {
+	u.SetNull(snippet.FieldFileSize)
+	return u
+}
+
+// SetMimeType sets the "mime_type" field.
+func (u *SnippetUpsert) SetMimeType(v string) *SnippetUpsert {
+	u.Set(snippet.FieldMimeType, v)
+	return u
+}
+
+// UpdateMimeType sets the "mime_type" field to the value that was provided on create.
+func (u *SnippetUpsert) UpdateMimeType() *SnippetUpsert {
+	u.SetExcluded(snippet.FieldMimeType)
+	return u
+}
+
+// ClearMimeType clears the value of the "mime_type" field.
+func (u *SnippetUpsert) ClearMimeType() *SnippetUpsert {
+	u.SetNull(snippet.FieldMimeType)
+	return u
+}
+
+// SetLanguage sets the "language" field.
+func (u *SnippetUpsert) SetLanguage(v string) *SnippetUpsert {
+	u.Set(snippet.FieldLanguage, v)
+	return u
+}
+
+// UpdateLanguage sets the "language" field to the value that was provided on create.
+func (u *SnippetUpsert) UpdateLanguage() *SnippetUpsert {
+	u.SetExcluded(snippet.FieldLanguage)
+	return u
+}
+
+// SetGroupID sets the "group_id" field.
+func (u *SnippetUpsert) SetGroupID(v int64) *SnippetUpsert {
+	u.Set(snippet.FieldGroupID, v)
+	return u
+}
+
+// UpdateGroupID sets the "group_id" field to the value that was provided on create.
+func (u *SnippetUpsert) UpdateGroupID() *SnippetUpsert {
+	u.SetExcluded(snippet.FieldGroupID)
+	return u
+}
+
+// ClearGroupID clears the value of the "group_id" field.
+func (u *SnippetUpsert) ClearGroupID() *SnippetUpsert {
+	u.SetNull(snippet.FieldGroupID)
+	return u
+}
+
+// SetSortOrder sets the "sort_order" field.
+func (u *SnippetUpsert) SetSortOrder(v int) *SnippetUpsert {
+	u.Set(snippet.FieldSortOrder, v)
+	return u
+}
+
+// UpdateSortOrder sets the "sort_order" field to the value that was provided on create.
+func (u *SnippetUpsert) UpdateSortOrder() *SnippetUpsert {
+	u.SetExcluded(snippet.FieldSortOrder)
+	return u
+}
+
+// AddSortOrder adds v to the "sort_order" field.
+func (u *SnippetUpsert) AddSortOrder(v int) *SnippetUpsert {
+	u.Add(snippet.FieldSortOrder, v)
+	return u
+}
+
+// SetIsFavorite sets the "is_favorite" field.
+func (u *SnippetUpsert) SetIsFavorite(v bool) *SnippetUpsert {
+	u.Set(snippet.FieldIsFavorite, v)
+	return u
+}
+
+// UpdateIsFavorite sets the "is_favorite" field to the value that was provided on create.
+func (u *SnippetUpsert) UpdateIsFavorite() *SnippetUpsert {
+	u.SetExcluded(snippet.FieldIsFavorite)
+	return u
+}
+
+// SetDeletedAt sets the "deleted_at" field.
+func (u *SnippetUpsert) SetDeletedAt(v time.Time) *SnippetUpsert {
+	u.Set(snippet.FieldDeletedAt, v)
+	return u
+}
+
+// UpdateDeletedAt sets the "deleted_at" field to the value that was provided on create.
+func (u *SnippetUpsert) UpdateDeletedAt() *SnippetUpsert {
+	u.SetExcluded(snippet.FieldDeletedAt)
+	return u
+}
+
+// ClearDeletedAt clears the value of the "deleted_at" field.
+func (u *SnippetUpsert) ClearDeletedAt() *SnippetUpsert {
+	u.SetNull(snippet.FieldDeletedAt)
+	return u
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *SnippetUpsert) SetUpdatedAt(v time.Time) *SnippetUpsert {
+	u.Set(snippet.FieldUpdatedAt, v)
+	return u
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *SnippetUpsert) UpdateUpdatedAt() *SnippetUpsert {
+	u.SetExcluded(snippet.FieldUpdatedAt)
+	return u
+}
+
+// UpdateNewValues updates the mutable fields using the new values that were set on create except the ID field.
+// Using this option is equivalent to using:
+//
+//	client.Snippet.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//			sql.ResolveWith(func(u *sql.UpdateSet) {
+//				u.SetIgnore(snippet.FieldID)
+//			}),
+//		).
+//		Exec(ctx)
+func (u *SnippetUpsertOne) UpdateNewValues() *SnippetUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		if _, exists := u.create.mutation.ID(); exists {
+			s.SetIgnore(snippet.FieldID)
+		}
+		if _, exists := u.create.mutation.CreatedAt(); exists {
+			s.SetIgnore(snippet.FieldCreatedAt)
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.Snippet.Create().
+//	    OnConflict(sql.ResolveWithIgnore()).
+//	    Exec(ctx)
+func (u *SnippetUpsertOne) Ignore() *SnippetUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *SnippetUpsertOne) DoNothing() *SnippetUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the SnippetCreate.OnConflict
+// documentation for more info.
+func (u *SnippetUpsertOne) Update(set func(*SnippetUpsert)) *SnippetUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&SnippetUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetOwnerID sets the "owner_id" field.
+func (u *SnippetUpsertOne) SetOwnerID(v int64) *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.SetOwnerID(v)
+	})
+}
+
+// AddOwnerID adds v to the "owner_id" field.
+func (u *SnippetUpsertOne) AddOwnerID(v int64) *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.AddOwnerID(v)
+	})
+}
+
+// UpdateOwnerID sets the "owner_id" field to the value that was provided on create.
+func (u *SnippetUpsertOne) UpdateOwnerID() *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.UpdateOwnerID()
+	})
+}
+
+// SetType sets the "type" field.
+func (u *SnippetUpsertOne) SetType(v snippet.Type) *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.SetType(v)
+	})
+}
+
+// UpdateType sets the "type" field to the value that was provided on create.
+func (u *SnippetUpsertOne) UpdateType() *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.UpdateType()
+	})
+}
+
+// SetTitle sets the "title" field.
+func (u *SnippetUpsertOne) SetTitle(v string) *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.SetTitle(v)
+	})
+}
+
+// UpdateTitle sets the "title" field to the value that was provided on create.
+func (u *SnippetUpsertOne) UpdateTitle() *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.UpdateTitle()
+	})
+}
+
+// SetContent sets the "content" field.
+func (u *SnippetUpsertOne) SetContent(v string) *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.SetContent(v)
+	})
+}
+
+// UpdateContent sets the "content" field to the value that was provided on create.
+func (u *SnippetUpsertOne) UpdateContent() *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.UpdateContent()
+	})
+}
+
+// ClearContent clears the value of the "content" field.
+func (u *SnippetUpsertOne) ClearContent() *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.ClearContent()
+	})
+}
+
+// SetFileURL sets the "file_url" field.
+func (u *SnippetUpsertOne) SetFileURL(v string) *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.SetFileURL(v)
+	})
+}
+
+// UpdateFileURL sets the "file_url" field to the value that was provided on create.
+func (u *SnippetUpsertOne) UpdateFileURL() *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.UpdateFileURL()
+	})
+}
+
+// ClearFileURL clears the value of the "file_url" field.
+func (u *SnippetUpsertOne) ClearFileURL() *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.ClearFileURL()
+	})
+}
+
+// SetFileSize sets the "file_size" field.
+func (u *SnippetUpsertOne) SetFileSize(v int64) *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.SetFileSize(v)
+	})
+}
+
+// AddFileSize adds v to the "file_size" field.
+func (u *SnippetUpsertOne) AddFileSize(v int64) *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.AddFileSize(v)
+	})
+}
+
+// UpdateFileSize sets the "file_size" field to the value that was provided on create.
+func (u *SnippetUpsertOne) UpdateFileSize() *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.UpdateFileSize()
+	})
+}
+
+// ClearFileSize clears the value of the "file_size" field.
+func (u *SnippetUpsertOne) ClearFileSize() *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.ClearFileSize()
+	})
+}
+
+// SetMimeType sets the "mime_type" field.
+func (u *SnippetUpsertOne) SetMimeType(v string) *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.SetMimeType(v)
+	})
+}
+
+// UpdateMimeType sets the "mime_type" field to the value that was provided on create.
+func (u *SnippetUpsertOne) UpdateMimeType() *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.UpdateMimeType()
+	})
+}
+
+// ClearMimeType clears the value of the "mime_type" field.
+func (u *SnippetUpsertOne) ClearMimeType() *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.ClearMimeType()
+	})
+}
+
+// SetLanguage sets the "language" field.
+func (u *SnippetUpsertOne) SetLanguage(v string) *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.SetLanguage(v)
+	})
+}
+
+// UpdateLanguage sets the "language" field to the value that was provided on create.
+func (u *SnippetUpsertOne) UpdateLanguage() *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.UpdateLanguage()
+	})
+}
+
+// SetGroupID sets the "group_id" field.
+func (u *SnippetUpsertOne) SetGroupID(v int64) *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.SetGroupID(v)
+	})
+}
+
+// UpdateGroupID sets the "group_id" field to the value that was provided on create.
+func (u *SnippetUpsertOne) UpdateGroupID() *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.UpdateGroupID()
+	})
+}
+
+// ClearGroupID clears the value of the "group_id" field.
+func (u *SnippetUpsertOne) ClearGroupID() *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.ClearGroupID()
+	})
+}
+
+// SetSortOrder sets the "sort_order" field.
+func (u *SnippetUpsertOne) SetSortOrder(v int) *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.SetSortOrder(v)
+	})
+}
+
+// AddSortOrder adds v to the "sort_order" field.
+func (u *SnippetUpsertOne) AddSortOrder(v int) *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.AddSortOrder(v)
+	})
+}
+
+// UpdateSortOrder sets the "sort_order" field to the value that was provided on create.
+func (u *SnippetUpsertOne) UpdateSortOrder() *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.UpdateSortOrder()
+	})
+}
+
+// SetIsFavorite sets the "is_favorite" field.
+func (u *SnippetUpsertOne) SetIsFavorite(v bool) *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.SetIsFavorite(v)
+	})
+}
+
+// UpdateIsFavorite sets the "is_favorite" field to the value that was provided on create.
+func (u *SnippetUpsertOne) UpdateIsFavorite() *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.UpdateIsFavorite()
+	})
+}
+
+// SetDeletedAt sets the "deleted_at" field.
+func (u *SnippetUpsertOne) SetDeletedAt(v time.Time) *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.SetDeletedAt(v)
+	})
+}
+
+// UpdateDeletedAt sets the "deleted_at" field to the value that was provided on create.
+func (u *SnippetUpsertOne) UpdateDeletedAt() *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.UpdateDeletedAt()
+	})
+}
+
+// ClearDeletedAt clears the value of the "deleted_at" field.
+func (u *SnippetUpsertOne) ClearDeletedAt() *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.ClearDeletedAt()
+	})
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *SnippetUpsertOne) SetUpdatedAt(v time.Time) *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.SetUpdatedAt(v)
+	})
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *SnippetUpsertOne) UpdateUpdatedAt() *SnippetUpsertOne {
+	return u.Update(func(s *SnippetUpsert) {
+		s.UpdateUpdatedAt()
+	})
+}
+
+// Exec executes the query.
+func (u *SnippetUpsertOne) Exec(ctx context.Context) error {
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for SnippetCreate.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *SnippetUpsertOne) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// Exec executes the UPSERT query and returns the inserted/updated ID.
+func (u *SnippetUpsertOne) ID(ctx context.Context) (id int64, err error) {
+	node, err := u.create.Save(ctx)
+	if err != nil {
+		return id, err
+	}
+	return node.ID, nil
+}
+
+// IDX is like ID, but panics if an error occurs.
+func (u *SnippetUpsertOne) IDX(ctx context.Context) int64 {
+	id, err := u.ID(ctx)
+	if err != nil {
+		panic(err)
+	}
+	return id
 }
 
 // SnippetCreateBulk is the builder for creating many Snippet entities in bulk.
@@ -436,6 +1097,7 @@ type SnippetCreateBulk struct {
 	config
 	err      error
 	builders []*SnippetCreate
+	conflict []sql.ConflictOption
 }
 
 // Save creates the Snippet entities in the database.
@@ -465,6 +1127,7 @@ func (_c *SnippetCreateBulk) Save(ctx context.Context) ([]*Snippet, error) {
 					_, err = mutators[i+1].Mutate(root, _c.builders[i+1].mutation)
 				} else {
 					spec := &sqlgraph.BatchCreateSpec{Nodes: specs}
+					spec.OnConflict = _c.conflict
 					// Invoke the actual operation on the latest mutation in the chain.
 					if err = sqlgraph.BatchCreate(ctx, _c.driver, spec); err != nil {
 						if sqlgraph.IsConstraintError(err) {
@@ -515,6 +1178,368 @@ func (_c *SnippetCreateBulk) Exec(ctx context.Context) error {
 // ExecX is like Exec, but panics if an error occurs.
 func (_c *SnippetCreateBulk) ExecX(ctx context.Context) {
 	if err := _c.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.Snippet.CreateBulk(builders...).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.SnippetUpsert) {
+//			SetOwnerID(v+v).
+//		}).
+//		Exec(ctx)
+func (_c *SnippetCreateBulk) OnConflict(opts ...sql.ConflictOption) *SnippetUpsertBulk {
+	_c.conflict = opts
+	return &SnippetUpsertBulk{
+		create: _c,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.Snippet.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (_c *SnippetCreateBulk) OnConflictColumns(columns ...string) *SnippetUpsertBulk {
+	_c.conflict = append(_c.conflict, sql.ConflictColumns(columns...))
+	return &SnippetUpsertBulk{
+		create: _c,
+	}
+}
+
+// SnippetUpsertBulk is the builder for "upsert"-ing
+// a bulk of Snippet nodes.
+type SnippetUpsertBulk struct {
+	create *SnippetCreateBulk
+}
+
+// UpdateNewValues updates the mutable fields using the new values that
+// were set on create. Using this option is equivalent to using:
+//
+//	client.Snippet.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//			sql.ResolveWith(func(u *sql.UpdateSet) {
+//				u.SetIgnore(snippet.FieldID)
+//			}),
+//		).
+//		Exec(ctx)
+func (u *SnippetUpsertBulk) UpdateNewValues() *SnippetUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		for _, b := range u.create.builders {
+			if _, exists := b.mutation.ID(); exists {
+				s.SetIgnore(snippet.FieldID)
+			}
+			if _, exists := b.mutation.CreatedAt(); exists {
+				s.SetIgnore(snippet.FieldCreatedAt)
+			}
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.Snippet.Create().
+//		OnConflict(sql.ResolveWithIgnore()).
+//		Exec(ctx)
+func (u *SnippetUpsertBulk) Ignore() *SnippetUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *SnippetUpsertBulk) DoNothing() *SnippetUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the SnippetCreateBulk.OnConflict
+// documentation for more info.
+func (u *SnippetUpsertBulk) Update(set func(*SnippetUpsert)) *SnippetUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&SnippetUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetOwnerID sets the "owner_id" field.
+func (u *SnippetUpsertBulk) SetOwnerID(v int64) *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.SetOwnerID(v)
+	})
+}
+
+// AddOwnerID adds v to the "owner_id" field.
+func (u *SnippetUpsertBulk) AddOwnerID(v int64) *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.AddOwnerID(v)
+	})
+}
+
+// UpdateOwnerID sets the "owner_id" field to the value that was provided on create.
+func (u *SnippetUpsertBulk) UpdateOwnerID() *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.UpdateOwnerID()
+	})
+}
+
+// SetType sets the "type" field.
+func (u *SnippetUpsertBulk) SetType(v snippet.Type) *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.SetType(v)
+	})
+}
+
+// UpdateType sets the "type" field to the value that was provided on create.
+func (u *SnippetUpsertBulk) UpdateType() *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.UpdateType()
+	})
+}
+
+// SetTitle sets the "title" field.
+func (u *SnippetUpsertBulk) SetTitle(v string) *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.SetTitle(v)
+	})
+}
+
+// UpdateTitle sets the "title" field to the value that was provided on create.
+func (u *SnippetUpsertBulk) UpdateTitle() *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.UpdateTitle()
+	})
+}
+
+// SetContent sets the "content" field.
+func (u *SnippetUpsertBulk) SetContent(v string) *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.SetContent(v)
+	})
+}
+
+// UpdateContent sets the "content" field to the value that was provided on create.
+func (u *SnippetUpsertBulk) UpdateContent() *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.UpdateContent()
+	})
+}
+
+// ClearContent clears the value of the "content" field.
+func (u *SnippetUpsertBulk) ClearContent() *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.ClearContent()
+	})
+}
+
+// SetFileURL sets the "file_url" field.
+func (u *SnippetUpsertBulk) SetFileURL(v string) *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.SetFileURL(v)
+	})
+}
+
+// UpdateFileURL sets the "file_url" field to the value that was provided on create.
+func (u *SnippetUpsertBulk) UpdateFileURL() *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.UpdateFileURL()
+	})
+}
+
+// ClearFileURL clears the value of the "file_url" field.
+func (u *SnippetUpsertBulk) ClearFileURL() *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.ClearFileURL()
+	})
+}
+
+// SetFileSize sets the "file_size" field.
+func (u *SnippetUpsertBulk) SetFileSize(v int64) *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.SetFileSize(v)
+	})
+}
+
+// AddFileSize adds v to the "file_size" field.
+func (u *SnippetUpsertBulk) AddFileSize(v int64) *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.AddFileSize(v)
+	})
+}
+
+// UpdateFileSize sets the "file_size" field to the value that was provided on create.
+func (u *SnippetUpsertBulk) UpdateFileSize() *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.UpdateFileSize()
+	})
+}
+
+// ClearFileSize clears the value of the "file_size" field.
+func (u *SnippetUpsertBulk) ClearFileSize() *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.ClearFileSize()
+	})
+}
+
+// SetMimeType sets the "mime_type" field.
+func (u *SnippetUpsertBulk) SetMimeType(v string) *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.SetMimeType(v)
+	})
+}
+
+// UpdateMimeType sets the "mime_type" field to the value that was provided on create.
+func (u *SnippetUpsertBulk) UpdateMimeType() *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.UpdateMimeType()
+	})
+}
+
+// ClearMimeType clears the value of the "mime_type" field.
+func (u *SnippetUpsertBulk) ClearMimeType() *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.ClearMimeType()
+	})
+}
+
+// SetLanguage sets the "language" field.
+func (u *SnippetUpsertBulk) SetLanguage(v string) *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.SetLanguage(v)
+	})
+}
+
+// UpdateLanguage sets the "language" field to the value that was provided on create.
+func (u *SnippetUpsertBulk) UpdateLanguage() *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.UpdateLanguage()
+	})
+}
+
+// SetGroupID sets the "group_id" field.
+func (u *SnippetUpsertBulk) SetGroupID(v int64) *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.SetGroupID(v)
+	})
+}
+
+// UpdateGroupID sets the "group_id" field to the value that was provided on create.
+func (u *SnippetUpsertBulk) UpdateGroupID() *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.UpdateGroupID()
+	})
+}
+
+// ClearGroupID clears the value of the "group_id" field.
+func (u *SnippetUpsertBulk) ClearGroupID() *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.ClearGroupID()
+	})
+}
+
+// SetSortOrder sets the "sort_order" field.
+func (u *SnippetUpsertBulk) SetSortOrder(v int) *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.SetSortOrder(v)
+	})
+}
+
+// AddSortOrder adds v to the "sort_order" field.
+func (u *SnippetUpsertBulk) AddSortOrder(v int) *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.AddSortOrder(v)
+	})
+}
+
+// UpdateSortOrder sets the "sort_order" field to the value that was provided on create.
+func (u *SnippetUpsertBulk) UpdateSortOrder() *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.UpdateSortOrder()
+	})
+}
+
+// SetIsFavorite sets the "is_favorite" field.
+func (u *SnippetUpsertBulk) SetIsFavorite(v bool) *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.SetIsFavorite(v)
+	})
+}
+
+// UpdateIsFavorite sets the "is_favorite" field to the value that was provided on create.
+func (u *SnippetUpsertBulk) UpdateIsFavorite() *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.UpdateIsFavorite()
+	})
+}
+
+// SetDeletedAt sets the "deleted_at" field.
+func (u *SnippetUpsertBulk) SetDeletedAt(v time.Time) *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.SetDeletedAt(v)
+	})
+}
+
+// UpdateDeletedAt sets the "deleted_at" field to the value that was provided on create.
+func (u *SnippetUpsertBulk) UpdateDeletedAt() *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.UpdateDeletedAt()
+	})
+}
+
+// ClearDeletedAt clears the value of the "deleted_at" field.
+func (u *SnippetUpsertBulk) ClearDeletedAt() *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.ClearDeletedAt()
+	})
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *SnippetUpsertBulk) SetUpdatedAt(v time.Time) *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.SetUpdatedAt(v)
+	})
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *SnippetUpsertBulk) UpdateUpdatedAt() *SnippetUpsertBulk {
+	return u.Update(func(s *SnippetUpsert) {
+		s.UpdateUpdatedAt()
+	})
+}
+
+// Exec executes the query.
+func (u *SnippetUpsertBulk) Exec(ctx context.Context) error {
+	if u.create.err != nil {
+		return u.create.err
+	}
+	for i, b := range u.create.builders {
+		if len(b.conflict) != 0 {
+			return fmt.Errorf("ent: OnConflict was set for builder %d. Set it on the SnippetCreateBulk instead", i)
+		}
+	}
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for SnippetCreateBulk.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *SnippetUpsertBulk) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
 		panic(err)
 	}
 }

@@ -12,9 +12,15 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/luckysxx/go-note/internal/ent/aicalllog"
+	"github.com/luckysxx/go-note/internal/ent/aiusagedaily"
 	"github.com/luckysxx/go-note/internal/ent/group"
+	"github.com/luckysxx/go-note/internal/ent/share"
 	"github.com/luckysxx/go-note/internal/ent/snippet"
+	"github.com/luckysxx/go-note/internal/ent/snippetaimetadata"
+	"github.com/luckysxx/go-note/internal/ent/snippetlineage"
 	"github.com/luckysxx/go-note/internal/ent/tag"
+	"github.com/luckysxx/go-note/internal/ent/template"
 )
 
 // ent aliases to avoid import conflicts in user's code.
@@ -75,9 +81,15 @@ var (
 func checkColumn(t, c string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
-			group.Table:   group.ValidColumn,
-			snippet.Table: snippet.ValidColumn,
-			tag.Table:     tag.ValidColumn,
+			aicalllog.Table:         aicalllog.ValidColumn,
+			aiusagedaily.Table:      aiusagedaily.ValidColumn,
+			group.Table:             group.ValidColumn,
+			share.Table:             share.ValidColumn,
+			snippet.Table:           snippet.ValidColumn,
+			snippetaimetadata.Table: snippetaimetadata.ValidColumn,
+			snippetlineage.Table:    snippetlineage.ValidColumn,
+			tag.Table:               tag.ValidColumn,
+			template.Table:          template.ValidColumn,
 		})
 	})
 	return columnCheck(t, c)

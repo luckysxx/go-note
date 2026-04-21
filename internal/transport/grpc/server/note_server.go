@@ -5,9 +5,16 @@ import (
 
 	commonlogger "github.com/luckysxx/common/logger"
 	notepb "github.com/luckysxx/common/proto/note"
-	"github.com/luckysxx/go-note/internal/service"
-	servicecontract "github.com/luckysxx/go-note/internal/service/contract"
-	grpcerrs "github.com/luckysxx/go-note/internal/transport/grpc/errs"
+	aimetadatarepo "github.com/luckysxx/go-note/internal/repository/aimetadata"
+	groupsvc "github.com/luckysxx/go-note/internal/service/group"
+	lineagesvc "github.com/luckysxx/go-note/internal/service/lineage"
+	sharesvc "github.com/luckysxx/go-note/internal/service/share"
+	snippetsvc "github.com/luckysxx/go-note/internal/service/snippet"
+	"github.com/luckysxx/go-note/internal/service/snippet/contract"
+	tagsvc "github.com/luckysxx/go-note/internal/service/tag"
+	templatesvc "github.com/luckysxx/go-note/internal/service/template"
+	uploadsvc "github.com/luckysxx/go-note/internal/service/upload"
+	grpcerrs "github.com/luckysxx/go-note/internal/transport/grpc/codec/errs"
 	"github.com/luckysxx/go-note/internal/transport/grpc/interceptor"
 	"go.uber.org/zap"
 )
@@ -15,13 +22,40 @@ import (
 // NoteServer 实现 NoteServiceServer 接口。
 type NoteServer struct {
 	notepb.UnimplementedNoteServiceServer
-	snippetSvc service.SnippetService
-	log        *zap.Logger
+	snippetSvc     snippetsvc.SnippetService
+	groupSvc       groupsvc.GroupService
+	tagSvc         tagsvc.TagService
+	templateSvc    templatesvc.TemplateService
+	lineageSvc     lineagesvc.Service
+	shareSvc       sharesvc.Service
+	uploadSvc      uploadsvc.UploadService
+	aimetadataRepo aimetadatarepo.Repository
+	log            *zap.Logger
 }
 
 // NewNoteServer 创建一个 NoteService gRPC 服务实现。
-func NewNoteServer(snippetSvc service.SnippetService, log *zap.Logger) *NoteServer {
-	return &NoteServer{snippetSvc: snippetSvc, log: log}
+func NewNoteServer(
+	snippetSvc snippetsvc.SnippetService,
+	groupSvc groupsvc.GroupService,
+	tagSvc tagsvc.TagService,
+	templateSvc templatesvc.TemplateService,
+	lineageSvc lineagesvc.Service,
+	shareSvc sharesvc.Service,
+	uploadSvc uploadsvc.UploadService,
+	aimetadataRepo aimetadatarepo.Repository,
+	log *zap.Logger,
+) *NoteServer {
+	return &NoteServer{
+		snippetSvc:     snippetSvc,
+		groupSvc:       groupSvc,
+		tagSvc:         tagSvc,
+		templateSvc:    templateSvc,
+		lineageSvc:     lineageSvc,
+		shareSvc:       shareSvc,
+		uploadSvc:      uploadSvc,
+		aimetadataRepo: aimetadataRepo,
+		log:            log,
+	}
 }
 
 func (s *NoteServer) CreateSnippet(ctx context.Context, req *notepb.CreateSnippetRequest) (*notepb.SnippetResponse, error) {
@@ -30,13 +64,17 @@ func (s *NoteServer) CreateSnippet(ctx context.Context, req *notepb.CreateSnippe
 		return nil, err
 	}
 
-	result, err := s.snippetSvc.Create(ctx, userID, &servicecontract.CreateSnippetCommand{
-		Type:       "code",
-		Title:      req.Title,
-		Content:    req.Content,
-		Language:   req.Language,
-		Visibility: req.Visibility,
-	})
+	cmd := &contract.CreateSnippetCommand{
+		Type:     "code",
+		Title:    req.Title,
+		Content:  req.Content,
+		Language: req.Language,
+	}
+	if req.GroupId != nil {
+		cmd.GroupID = req.GroupId
+	}
+
+	result, err := s.snippetSvc.Create(ctx, userID, cmd)
 	if err != nil {
 		commonlogger.Ctx(ctx, s.log).Error("gRPC CreateSnippet 失败", zap.Error(err))
 		return nil, grpcerrs.ToStatusError(err)
@@ -45,7 +83,12 @@ func (s *NoteServer) CreateSnippet(ctx context.Context, req *notepb.CreateSnippe
 }
 
 func (s *NoteServer) GetSnippet(ctx context.Context, req *notepb.GetSnippetRequest) (*notepb.SnippetResponse, error) {
-	result, err := s.snippetSvc.GetByID(ctx, req.SnippetId)
+	userID, err := interceptor.UserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := s.snippetSvc.GetMineByID(ctx, userID, req.SnippetId)
 	if err != nil {
 		commonlogger.Ctx(ctx, s.log).Error("gRPC GetSnippet 失败", zap.Int64("snippet_id", req.SnippetId), zap.Error(err))
 		return nil, grpcerrs.ToStatusError(err)
@@ -59,17 +102,37 @@ func (s *NoteServer) ListSnippets(ctx context.Context, req *notepb.ListSnippetsR
 		return nil, err
 	}
 
-	results, err := s.snippetSvc.ListMine(ctx, userID)
+	query := &contract.ListQuery{
+		Keyword:       req.Keyword,
+		Cursor:        req.Cursor,
+		Limit:         int(req.Limit),
+		SortBy:        req.SortBy,
+		Type:          req.Type,
+		Status:        req.Status,
+		OnlyFavorites: req.OnlyFavorites,
+	}
+	if req.GroupId != nil {
+		query.GroupID = req.GroupId
+	}
+	if req.TagId != nil {
+		query.TagID = req.TagId
+	}
+
+	result, err := s.snippetSvc.ListMineFiltered(ctx, userID, query)
 	if err != nil {
 		commonlogger.Ctx(ctx, s.log).Error("gRPC ListSnippets 失败", zap.Int64("user_id", userID), zap.Error(err))
 		return nil, grpcerrs.ToStatusError(err)
 	}
 
-	snippets := make([]*notepb.SnippetResponse, len(results))
-	for i := range results {
-		snippets[i] = toProto(&results[i])
+	snippets := make([]*notepb.SnippetResponse, 0, len(result.Items))
+	for i := range result.Items {
+		snippets = append(snippets, toProto(&result.Items[i]))
 	}
-	return &notepb.ListSnippetsResponse{Snippets: snippets}, nil
+	return &notepb.ListSnippetsResponse{
+		Snippets:   snippets,
+		NextCursor: result.NextCursor,
+		HasMore:    result.HasMore,
+	}, nil
 }
 
 func (s *NoteServer) UpdateSnippet(ctx context.Context, req *notepb.UpdateSnippetRequest) (*notepb.SnippetResponse, error) {
@@ -78,11 +141,10 @@ func (s *NoteServer) UpdateSnippet(ctx context.Context, req *notepb.UpdateSnippe
 		return nil, err
 	}
 
-	result, err := s.snippetSvc.Update(ctx, userID, req.SnippetId, &servicecontract.UpdateSnippetCommand{
-		Title:      req.Title,
-		Content:    req.Content,
-		Language:   req.Language,
-		Visibility: req.Visibility,
+	result, err := s.snippetSvc.Update(ctx, userID, req.SnippetId, &contract.UpdateSnippetCommand{
+		Title:    req.Title,
+		Content:  req.Content,
+		Language: req.Language,
 	})
 	if err != nil {
 		commonlogger.Ctx(ctx, s.log).Error("gRPC UpdateSnippet 失败", zap.Error(err))
@@ -92,7 +154,7 @@ func (s *NoteServer) UpdateSnippet(ctx context.Context, req *notepb.UpdateSnippe
 }
 
 // toProto 将业务层结果转为 protobuf 响应。
-func toProto(r *servicecontract.SnippetResult) *notepb.SnippetResponse {
+func toProto(r *contract.SnippetResult) *notepb.SnippetResponse {
 	resp := &notepb.SnippetResponse{
 		Id:         r.ID,
 		OwnerId:    r.OwnerID,
@@ -103,12 +165,29 @@ func toProto(r *servicecontract.SnippetResult) *notepb.SnippetResponse {
 		FileSize:   r.FileSize,
 		MimeType:   r.MimeType,
 		Language:   r.Language,
-		Visibility: r.Visibility,
 		CreatedAt:  r.CreatedAt,
 		UpdatedAt:  r.UpdatedAt,
+		TagIds:     r.TagIDs,
+		SortOrder:  int32(r.SortOrder),
+		IsFavorite: r.IsFavorite,
+		DeletedAt:  r.DeletedAt,
 	}
 	if r.GroupID != nil {
 		resp.GroupId = *r.GroupID
 	}
 	return resp
+}
+
+func (s *NoteServer) SetSnippetTags(ctx context.Context, req *notepb.SetSnippetTagsRequest) (*notepb.SetSnippetTagsResponse, error) {
+	userID, err := interceptor.UserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.snippetSvc.SetTags(ctx, userID, req.SnippetId, req.TagIds); err != nil {
+		commonlogger.Ctx(ctx, s.log).Error("gRPC SetSnippetTags 失败", zap.Error(err))
+		return nil, grpcerrs.ToStatusError(err)
+	}
+
+	return &notepb.SetSnippetTagsResponse{}, nil
 }

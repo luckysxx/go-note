@@ -9,6 +9,30 @@ import (
 	"github.com/luckysxx/go-note/internal/ent"
 )
 
+// The AICallLogFunc type is an adapter to allow the use of ordinary
+// function as AICallLog mutator.
+type AICallLogFunc func(context.Context, *ent.AICallLogMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f AICallLogFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.AICallLogMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.AICallLogMutation", m)
+}
+
+// The AIUsageDailyFunc type is an adapter to allow the use of ordinary
+// function as AIUsageDaily mutator.
+type AIUsageDailyFunc func(context.Context, *ent.AIUsageDailyMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f AIUsageDailyFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.AIUsageDailyMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.AIUsageDailyMutation", m)
+}
+
 // The GroupFunc type is an adapter to allow the use of ordinary
 // function as Group mutator.
 type GroupFunc func(context.Context, *ent.GroupMutation) (ent.Value, error)
@@ -19,6 +43,18 @@ func (f GroupFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.GroupMutation", m)
+}
+
+// The ShareFunc type is an adapter to allow the use of ordinary
+// function as Share mutator.
+type ShareFunc func(context.Context, *ent.ShareMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ShareFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ShareMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ShareMutation", m)
 }
 
 // The SnippetFunc type is an adapter to allow the use of ordinary
@@ -33,6 +69,30 @@ func (f SnippetFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, err
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.SnippetMutation", m)
 }
 
+// The SnippetAIMetadataFunc type is an adapter to allow the use of ordinary
+// function as SnippetAIMetadata mutator.
+type SnippetAIMetadataFunc func(context.Context, *ent.SnippetAIMetadataMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f SnippetAIMetadataFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.SnippetAIMetadataMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.SnippetAIMetadataMutation", m)
+}
+
+// The SnippetLineageFunc type is an adapter to allow the use of ordinary
+// function as SnippetLineage mutator.
+type SnippetLineageFunc func(context.Context, *ent.SnippetLineageMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f SnippetLineageFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.SnippetLineageMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.SnippetLineageMutation", m)
+}
+
 // The TagFunc type is an adapter to allow the use of ordinary
 // function as Tag mutator.
 type TagFunc func(context.Context, *ent.TagMutation) (ent.Value, error)
@@ -43,6 +103,18 @@ func (f TagFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) 
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.TagMutation", m)
+}
+
+// The TemplateFunc type is an adapter to allow the use of ordinary
+// function as Template mutator.
+type TemplateFunc func(context.Context, *ent.TemplateMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f TemplateFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.TemplateMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.TemplateMutation", m)
 }
 
 // Condition is a hook condition function.

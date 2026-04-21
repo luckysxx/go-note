@@ -3,6 +3,7 @@ package interceptor
 import (
 	"context"
 	"strconv"
+	"strings"
 
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -17,7 +18,11 @@ const userIDKey contextKey = "user_id"
 
 // GatewayAuthInterceptor 信任网关在 gRPC metadata 中注入的 x-user-id。
 func GatewayAuthInterceptor() grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		if isPublicMethod(info.FullMethod) {
+			return handler(ctx, req)
+		}
+
 		md, ok := metadata.FromIncomingContext(ctx)
 		if !ok {
 			return nil, status.Error(codes.Unauthenticated, "未找到 metadata")
@@ -35,6 +40,16 @@ func GatewayAuthInterceptor() grpc.UnaryServerInterceptor {
 
 		return handler(context.WithValue(ctx, userIDKey, userID), req)
 	}
+}
+
+func isPublicMethod(fullMethod string) bool {
+	switch fullMethod {
+	case "/note.NoteService/GetPublicSnippet",
+		"/note.NoteService/GetPublicShareByToken":
+		return true
+	}
+
+	return strings.HasPrefix(fullMethod, "/grpc.health.v1.Health/")
 }
 
 // UserIDFromContext 从 context 中提取 userID，供 gRPC handler 使用。

@@ -64,17 +64,26 @@ func (Snippet) Fields() []ent.Field {
 			MaxLen(30).
 			Comment("编程语言或文件类型标识"),
 
-		// ── 可见性 ──
-		field.Enum("visibility").
-			Values("public", "private").
-			Default("private").
-			Comment("可见性：public=公开 private=私有"),
-
 		// ── 分组关联 ──
 		field.Int64("group_id").
 			Optional().
 			Nillable().
 			Comment("所属分组 ID"),
+
+		// ── 排序 ──
+		field.Int("sort_order").
+			Default(0).
+			Comment("在所属分组内的排序权重，值越小越靠前，支持拖拽排序"),
+
+		// ── 附加元数据 ──
+		field.Bool("is_favorite").
+			Default(false).
+			Comment("是否已收藏"),
+
+		field.Time("deleted_at").
+			Optional().
+			Nillable().
+			Comment("删除时间，有值表示已进入回收站（软删除）"),
 
 		// ── 时间戳 ──
 		field.Time("created_at").
@@ -100,6 +109,9 @@ func (Snippet) Edges() []ent.Edge {
 
 		// Snippet ↔ Tag（多对多）
 		edge.To("tags", Tag.Type),
+
+		// Snippet ← Share（一对多）
+		edge.To("shares", Share.Type),
 	}
 }
 
@@ -107,8 +119,10 @@ func (Snippet) Edges() []ent.Edge {
 func (Snippet) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("owner_id"),
+		index.Fields("owner_id", "deleted_at"),
+		index.Fields("owner_id", "is_favorite"),
 		index.Fields("owner_id", "type"),
 		index.Fields("owner_id", "group_id"),
-		index.Fields("visibility"),
+		index.Fields("owner_id", "group_id", "sort_order"),
 	}
 }

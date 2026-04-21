@@ -95,6 +95,21 @@ func GroupID(v int64) predicate.Snippet {
 	return predicate.Snippet(sql.FieldEQ(FieldGroupID, v))
 }
 
+// SortOrder applies equality check predicate on the "sort_order" field. It's identical to SortOrderEQ.
+func SortOrder(v int) predicate.Snippet {
+	return predicate.Snippet(sql.FieldEQ(FieldSortOrder, v))
+}
+
+// IsFavorite applies equality check predicate on the "is_favorite" field. It's identical to IsFavoriteEQ.
+func IsFavorite(v bool) predicate.Snippet {
+	return predicate.Snippet(sql.FieldEQ(FieldIsFavorite, v))
+}
+
+// DeletedAt applies equality check predicate on the "deleted_at" field. It's identical to DeletedAtEQ.
+func DeletedAt(v time.Time) predicate.Snippet {
+	return predicate.Snippet(sql.FieldEQ(FieldDeletedAt, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.Snippet {
 	return predicate.Snippet(sql.FieldEQ(FieldCreatedAt, v))
@@ -570,26 +585,6 @@ func LanguageContainsFold(v string) predicate.Snippet {
 	return predicate.Snippet(sql.FieldContainsFold(FieldLanguage, v))
 }
 
-// VisibilityEQ applies the EQ predicate on the "visibility" field.
-func VisibilityEQ(v Visibility) predicate.Snippet {
-	return predicate.Snippet(sql.FieldEQ(FieldVisibility, v))
-}
-
-// VisibilityNEQ applies the NEQ predicate on the "visibility" field.
-func VisibilityNEQ(v Visibility) predicate.Snippet {
-	return predicate.Snippet(sql.FieldNEQ(FieldVisibility, v))
-}
-
-// VisibilityIn applies the In predicate on the "visibility" field.
-func VisibilityIn(vs ...Visibility) predicate.Snippet {
-	return predicate.Snippet(sql.FieldIn(FieldVisibility, vs...))
-}
-
-// VisibilityNotIn applies the NotIn predicate on the "visibility" field.
-func VisibilityNotIn(vs ...Visibility) predicate.Snippet {
-	return predicate.Snippet(sql.FieldNotIn(FieldVisibility, vs...))
-}
-
 // GroupIDEQ applies the EQ predicate on the "group_id" field.
 func GroupIDEQ(v int64) predicate.Snippet {
 	return predicate.Snippet(sql.FieldEQ(FieldGroupID, v))
@@ -618,6 +613,106 @@ func GroupIDIsNil() predicate.Snippet {
 // GroupIDNotNil applies the NotNil predicate on the "group_id" field.
 func GroupIDNotNil() predicate.Snippet {
 	return predicate.Snippet(sql.FieldNotNull(FieldGroupID))
+}
+
+// SortOrderEQ applies the EQ predicate on the "sort_order" field.
+func SortOrderEQ(v int) predicate.Snippet {
+	return predicate.Snippet(sql.FieldEQ(FieldSortOrder, v))
+}
+
+// SortOrderNEQ applies the NEQ predicate on the "sort_order" field.
+func SortOrderNEQ(v int) predicate.Snippet {
+	return predicate.Snippet(sql.FieldNEQ(FieldSortOrder, v))
+}
+
+// SortOrderIn applies the In predicate on the "sort_order" field.
+func SortOrderIn(vs ...int) predicate.Snippet {
+	return predicate.Snippet(sql.FieldIn(FieldSortOrder, vs...))
+}
+
+// SortOrderNotIn applies the NotIn predicate on the "sort_order" field.
+func SortOrderNotIn(vs ...int) predicate.Snippet {
+	return predicate.Snippet(sql.FieldNotIn(FieldSortOrder, vs...))
+}
+
+// SortOrderGT applies the GT predicate on the "sort_order" field.
+func SortOrderGT(v int) predicate.Snippet {
+	return predicate.Snippet(sql.FieldGT(FieldSortOrder, v))
+}
+
+// SortOrderGTE applies the GTE predicate on the "sort_order" field.
+func SortOrderGTE(v int) predicate.Snippet {
+	return predicate.Snippet(sql.FieldGTE(FieldSortOrder, v))
+}
+
+// SortOrderLT applies the LT predicate on the "sort_order" field.
+func SortOrderLT(v int) predicate.Snippet {
+	return predicate.Snippet(sql.FieldLT(FieldSortOrder, v))
+}
+
+// SortOrderLTE applies the LTE predicate on the "sort_order" field.
+func SortOrderLTE(v int) predicate.Snippet {
+	return predicate.Snippet(sql.FieldLTE(FieldSortOrder, v))
+}
+
+// IsFavoriteEQ applies the EQ predicate on the "is_favorite" field.
+func IsFavoriteEQ(v bool) predicate.Snippet {
+	return predicate.Snippet(sql.FieldEQ(FieldIsFavorite, v))
+}
+
+// IsFavoriteNEQ applies the NEQ predicate on the "is_favorite" field.
+func IsFavoriteNEQ(v bool) predicate.Snippet {
+	return predicate.Snippet(sql.FieldNEQ(FieldIsFavorite, v))
+}
+
+// DeletedAtEQ applies the EQ predicate on the "deleted_at" field.
+func DeletedAtEQ(v time.Time) predicate.Snippet {
+	return predicate.Snippet(sql.FieldEQ(FieldDeletedAt, v))
+}
+
+// DeletedAtNEQ applies the NEQ predicate on the "deleted_at" field.
+func DeletedAtNEQ(v time.Time) predicate.Snippet {
+	return predicate.Snippet(sql.FieldNEQ(FieldDeletedAt, v))
+}
+
+// DeletedAtIn applies the In predicate on the "deleted_at" field.
+func DeletedAtIn(vs ...time.Time) predicate.Snippet {
+	return predicate.Snippet(sql.FieldIn(FieldDeletedAt, vs...))
+}
+
+// DeletedAtNotIn applies the NotIn predicate on the "deleted_at" field.
+func DeletedAtNotIn(vs ...time.Time) predicate.Snippet {
+	return predicate.Snippet(sql.FieldNotIn(FieldDeletedAt, vs...))
+}
+
+// DeletedAtGT applies the GT predicate on the "deleted_at" field.
+func DeletedAtGT(v time.Time) predicate.Snippet {
+	return predicate.Snippet(sql.FieldGT(FieldDeletedAt, v))
+}
+
+// DeletedAtGTE applies the GTE predicate on the "deleted_at" field.
+func DeletedAtGTE(v time.Time) predicate.Snippet {
+	return predicate.Snippet(sql.FieldGTE(FieldDeletedAt, v))
+}
+
+// DeletedAtLT applies the LT predicate on the "deleted_at" field.
+func DeletedAtLT(v time.Time) predicate.Snippet {
+	return predicate.Snippet(sql.FieldLT(FieldDeletedAt, v))
+}
+
+// DeletedAtLTE applies the LTE predicate on the "deleted_at" field.
+func DeletedAtLTE(v time.Time) predicate.Snippet {
+	return predicate.Snippet(sql.FieldLTE(FieldDeletedAt, v))
+}
+
+// DeletedAtIsNil applies the IsNil predicate on the "deleted_at" field.
+func DeletedAtIsNil() predicate.Snippet {
+	return predicate.Snippet(sql.FieldIsNull(FieldDeletedAt))
+}
+
+// DeletedAtNotNil applies the NotNil predicate on the "deleted_at" field.
+func DeletedAtNotNil() predicate.Snippet {
+	return predicate.Snippet(sql.FieldNotNull(FieldDeletedAt))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
@@ -738,6 +833,29 @@ func HasTags() predicate.Snippet {
 func HasTagsWith(preds ...predicate.Tag) predicate.Snippet {
 	return predicate.Snippet(func(s *sql.Selector) {
 		step := newTagsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasShares applies the HasEdge predicate on the "shares" edge.
+func HasShares() predicate.Snippet {
+	return predicate.Snippet(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, SharesTable, SharesColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasSharesWith applies the HasEdge predicate on the "shares" edge with a given conditions (other predicates).
+func HasSharesWith(preds ...predicate.Share) predicate.Snippet {
+	return predicate.Snippet(func(s *sql.Selector) {
+		step := newSharesStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

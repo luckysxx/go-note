@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/luckysxx/go-note/internal/ent/group"
 	"github.com/luckysxx/go-note/internal/ent/predicate"
+	"github.com/luckysxx/go-note/internal/ent/share"
 	"github.com/luckysxx/go-note/internal/ent/snippet"
 	"github.com/luckysxx/go-note/internal/ent/tag"
 )
@@ -180,20 +181,6 @@ func (_u *SnippetUpdate) SetNillableLanguage(v *string) *SnippetUpdate {
 	return _u
 }
 
-// SetVisibility sets the "visibility" field.
-func (_u *SnippetUpdate) SetVisibility(v snippet.Visibility) *SnippetUpdate {
-	_u.mutation.SetVisibility(v)
-	return _u
-}
-
-// SetNillableVisibility sets the "visibility" field if the given value is not nil.
-func (_u *SnippetUpdate) SetNillableVisibility(v *snippet.Visibility) *SnippetUpdate {
-	if v != nil {
-		_u.SetVisibility(*v)
-	}
-	return _u
-}
-
 // SetGroupID sets the "group_id" field.
 func (_u *SnippetUpdate) SetGroupID(v int64) *SnippetUpdate {
 	_u.mutation.SetGroupID(v)
@@ -211,6 +198,61 @@ func (_u *SnippetUpdate) SetNillableGroupID(v *int64) *SnippetUpdate {
 // ClearGroupID clears the value of the "group_id" field.
 func (_u *SnippetUpdate) ClearGroupID() *SnippetUpdate {
 	_u.mutation.ClearGroupID()
+	return _u
+}
+
+// SetSortOrder sets the "sort_order" field.
+func (_u *SnippetUpdate) SetSortOrder(v int) *SnippetUpdate {
+	_u.mutation.ResetSortOrder()
+	_u.mutation.SetSortOrder(v)
+	return _u
+}
+
+// SetNillableSortOrder sets the "sort_order" field if the given value is not nil.
+func (_u *SnippetUpdate) SetNillableSortOrder(v *int) *SnippetUpdate {
+	if v != nil {
+		_u.SetSortOrder(*v)
+	}
+	return _u
+}
+
+// AddSortOrder adds value to the "sort_order" field.
+func (_u *SnippetUpdate) AddSortOrder(v int) *SnippetUpdate {
+	_u.mutation.AddSortOrder(v)
+	return _u
+}
+
+// SetIsFavorite sets the "is_favorite" field.
+func (_u *SnippetUpdate) SetIsFavorite(v bool) *SnippetUpdate {
+	_u.mutation.SetIsFavorite(v)
+	return _u
+}
+
+// SetNillableIsFavorite sets the "is_favorite" field if the given value is not nil.
+func (_u *SnippetUpdate) SetNillableIsFavorite(v *bool) *SnippetUpdate {
+	if v != nil {
+		_u.SetIsFavorite(*v)
+	}
+	return _u
+}
+
+// SetDeletedAt sets the "deleted_at" field.
+func (_u *SnippetUpdate) SetDeletedAt(v time.Time) *SnippetUpdate {
+	_u.mutation.SetDeletedAt(v)
+	return _u
+}
+
+// SetNillableDeletedAt sets the "deleted_at" field if the given value is not nil.
+func (_u *SnippetUpdate) SetNillableDeletedAt(v *time.Time) *SnippetUpdate {
+	if v != nil {
+		_u.SetDeletedAt(*v)
+	}
+	return _u
+}
+
+// ClearDeletedAt clears the value of the "deleted_at" field.
+func (_u *SnippetUpdate) ClearDeletedAt() *SnippetUpdate {
+	_u.mutation.ClearDeletedAt()
 	return _u
 }
 
@@ -238,6 +280,21 @@ func (_u *SnippetUpdate) AddTags(v ...*Tag) *SnippetUpdate {
 		ids[i] = v[i].ID
 	}
 	return _u.AddTagIDs(ids...)
+}
+
+// AddShareIDs adds the "shares" edge to the Share entity by IDs.
+func (_u *SnippetUpdate) AddShareIDs(ids ...int64) *SnippetUpdate {
+	_u.mutation.AddShareIDs(ids...)
+	return _u
+}
+
+// AddShares adds the "shares" edges to the Share entity.
+func (_u *SnippetUpdate) AddShares(v ...*Share) *SnippetUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddShareIDs(ids...)
 }
 
 // Mutation returns the SnippetMutation object of the builder.
@@ -270,6 +327,27 @@ func (_u *SnippetUpdate) RemoveTags(v ...*Tag) *SnippetUpdate {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveTagIDs(ids...)
+}
+
+// ClearShares clears all "shares" edges to the Share entity.
+func (_u *SnippetUpdate) ClearShares() *SnippetUpdate {
+	_u.mutation.ClearShares()
+	return _u
+}
+
+// RemoveShareIDs removes the "shares" edge to Share entities by IDs.
+func (_u *SnippetUpdate) RemoveShareIDs(ids ...int64) *SnippetUpdate {
+	_u.mutation.RemoveShareIDs(ids...)
+	return _u
+}
+
+// RemoveShares removes "shares" edges to Share entities.
+func (_u *SnippetUpdate) RemoveShares(v ...*Share) *SnippetUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveShareIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -340,11 +418,6 @@ func (_u *SnippetUpdate) check() error {
 			return &ValidationError{Name: "language", err: fmt.Errorf(`ent: validator failed for field "Snippet.language": %w`, err)}
 		}
 	}
-	if v, ok := _u.mutation.Visibility(); ok {
-		if err := snippet.VisibilityValidator(v); err != nil {
-			return &ValidationError{Name: "visibility", err: fmt.Errorf(`ent: validator failed for field "Snippet.visibility": %w`, err)}
-		}
-	}
 	return nil
 }
 
@@ -402,8 +475,20 @@ func (_u *SnippetUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.Language(); ok {
 		_spec.SetField(snippet.FieldLanguage, field.TypeString, value)
 	}
-	if value, ok := _u.mutation.Visibility(); ok {
-		_spec.SetField(snippet.FieldVisibility, field.TypeEnum, value)
+	if value, ok := _u.mutation.SortOrder(); ok {
+		_spec.SetField(snippet.FieldSortOrder, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSortOrder(); ok {
+		_spec.AddField(snippet.FieldSortOrder, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.IsFavorite(); ok {
+		_spec.SetField(snippet.FieldIsFavorite, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.DeletedAt(); ok {
+		_spec.SetField(snippet.FieldDeletedAt, field.TypeTime, value)
+	}
+	if _u.mutation.DeletedAtCleared() {
+		_spec.ClearField(snippet.FieldDeletedAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(snippet.FieldUpdatedAt, field.TypeTime, value)
@@ -475,6 +560,51 @@ func (_u *SnippetUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(tag.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.SharesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   snippet.SharesTable,
+			Columns: []string{snippet.SharesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(share.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedSharesIDs(); len(nodes) > 0 && !_u.mutation.SharesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   snippet.SharesTable,
+			Columns: []string{snippet.SharesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(share.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.SharesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   snippet.SharesTable,
+			Columns: []string{snippet.SharesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(share.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {
@@ -652,20 +782,6 @@ func (_u *SnippetUpdateOne) SetNillableLanguage(v *string) *SnippetUpdateOne {
 	return _u
 }
 
-// SetVisibility sets the "visibility" field.
-func (_u *SnippetUpdateOne) SetVisibility(v snippet.Visibility) *SnippetUpdateOne {
-	_u.mutation.SetVisibility(v)
-	return _u
-}
-
-// SetNillableVisibility sets the "visibility" field if the given value is not nil.
-func (_u *SnippetUpdateOne) SetNillableVisibility(v *snippet.Visibility) *SnippetUpdateOne {
-	if v != nil {
-		_u.SetVisibility(*v)
-	}
-	return _u
-}
-
 // SetGroupID sets the "group_id" field.
 func (_u *SnippetUpdateOne) SetGroupID(v int64) *SnippetUpdateOne {
 	_u.mutation.SetGroupID(v)
@@ -683,6 +799,61 @@ func (_u *SnippetUpdateOne) SetNillableGroupID(v *int64) *SnippetUpdateOne {
 // ClearGroupID clears the value of the "group_id" field.
 func (_u *SnippetUpdateOne) ClearGroupID() *SnippetUpdateOne {
 	_u.mutation.ClearGroupID()
+	return _u
+}
+
+// SetSortOrder sets the "sort_order" field.
+func (_u *SnippetUpdateOne) SetSortOrder(v int) *SnippetUpdateOne {
+	_u.mutation.ResetSortOrder()
+	_u.mutation.SetSortOrder(v)
+	return _u
+}
+
+// SetNillableSortOrder sets the "sort_order" field if the given value is not nil.
+func (_u *SnippetUpdateOne) SetNillableSortOrder(v *int) *SnippetUpdateOne {
+	if v != nil {
+		_u.SetSortOrder(*v)
+	}
+	return _u
+}
+
+// AddSortOrder adds value to the "sort_order" field.
+func (_u *SnippetUpdateOne) AddSortOrder(v int) *SnippetUpdateOne {
+	_u.mutation.AddSortOrder(v)
+	return _u
+}
+
+// SetIsFavorite sets the "is_favorite" field.
+func (_u *SnippetUpdateOne) SetIsFavorite(v bool) *SnippetUpdateOne {
+	_u.mutation.SetIsFavorite(v)
+	return _u
+}
+
+// SetNillableIsFavorite sets the "is_favorite" field if the given value is not nil.
+func (_u *SnippetUpdateOne) SetNillableIsFavorite(v *bool) *SnippetUpdateOne {
+	if v != nil {
+		_u.SetIsFavorite(*v)
+	}
+	return _u
+}
+
+// SetDeletedAt sets the "deleted_at" field.
+func (_u *SnippetUpdateOne) SetDeletedAt(v time.Time) *SnippetUpdateOne {
+	_u.mutation.SetDeletedAt(v)
+	return _u
+}
+
+// SetNillableDeletedAt sets the "deleted_at" field if the given value is not nil.
+func (_u *SnippetUpdateOne) SetNillableDeletedAt(v *time.Time) *SnippetUpdateOne {
+	if v != nil {
+		_u.SetDeletedAt(*v)
+	}
+	return _u
+}
+
+// ClearDeletedAt clears the value of the "deleted_at" field.
+func (_u *SnippetUpdateOne) ClearDeletedAt() *SnippetUpdateOne {
+	_u.mutation.ClearDeletedAt()
 	return _u
 }
 
@@ -710,6 +881,21 @@ func (_u *SnippetUpdateOne) AddTags(v ...*Tag) *SnippetUpdateOne {
 		ids[i] = v[i].ID
 	}
 	return _u.AddTagIDs(ids...)
+}
+
+// AddShareIDs adds the "shares" edge to the Share entity by IDs.
+func (_u *SnippetUpdateOne) AddShareIDs(ids ...int64) *SnippetUpdateOne {
+	_u.mutation.AddShareIDs(ids...)
+	return _u
+}
+
+// AddShares adds the "shares" edges to the Share entity.
+func (_u *SnippetUpdateOne) AddShares(v ...*Share) *SnippetUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddShareIDs(ids...)
 }
 
 // Mutation returns the SnippetMutation object of the builder.
@@ -742,6 +928,27 @@ func (_u *SnippetUpdateOne) RemoveTags(v ...*Tag) *SnippetUpdateOne {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveTagIDs(ids...)
+}
+
+// ClearShares clears all "shares" edges to the Share entity.
+func (_u *SnippetUpdateOne) ClearShares() *SnippetUpdateOne {
+	_u.mutation.ClearShares()
+	return _u
+}
+
+// RemoveShareIDs removes the "shares" edge to Share entities by IDs.
+func (_u *SnippetUpdateOne) RemoveShareIDs(ids ...int64) *SnippetUpdateOne {
+	_u.mutation.RemoveShareIDs(ids...)
+	return _u
+}
+
+// RemoveShares removes "shares" edges to Share entities.
+func (_u *SnippetUpdateOne) RemoveShares(v ...*Share) *SnippetUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveShareIDs(ids...)
 }
 
 // Where appends a list predicates to the SnippetUpdate builder.
@@ -825,11 +1032,6 @@ func (_u *SnippetUpdateOne) check() error {
 			return &ValidationError{Name: "language", err: fmt.Errorf(`ent: validator failed for field "Snippet.language": %w`, err)}
 		}
 	}
-	if v, ok := _u.mutation.Visibility(); ok {
-		if err := snippet.VisibilityValidator(v); err != nil {
-			return &ValidationError{Name: "visibility", err: fmt.Errorf(`ent: validator failed for field "Snippet.visibility": %w`, err)}
-		}
-	}
 	return nil
 }
 
@@ -904,8 +1106,20 @@ func (_u *SnippetUpdateOne) sqlSave(ctx context.Context) (_node *Snippet, err er
 	if value, ok := _u.mutation.Language(); ok {
 		_spec.SetField(snippet.FieldLanguage, field.TypeString, value)
 	}
-	if value, ok := _u.mutation.Visibility(); ok {
-		_spec.SetField(snippet.FieldVisibility, field.TypeEnum, value)
+	if value, ok := _u.mutation.SortOrder(); ok {
+		_spec.SetField(snippet.FieldSortOrder, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSortOrder(); ok {
+		_spec.AddField(snippet.FieldSortOrder, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.IsFavorite(); ok {
+		_spec.SetField(snippet.FieldIsFavorite, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.DeletedAt(); ok {
+		_spec.SetField(snippet.FieldDeletedAt, field.TypeTime, value)
+	}
+	if _u.mutation.DeletedAtCleared() {
+		_spec.ClearField(snippet.FieldDeletedAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(snippet.FieldUpdatedAt, field.TypeTime, value)
@@ -977,6 +1191,51 @@ func (_u *SnippetUpdateOne) sqlSave(ctx context.Context) (_node *Snippet, err er
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(tag.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.SharesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   snippet.SharesTable,
+			Columns: []string{snippet.SharesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(share.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedSharesIDs(); len(nodes) > 0 && !_u.mutation.SharesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   snippet.SharesTable,
+			Columns: []string{snippet.SharesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(share.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.SharesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   snippet.SharesTable,
+			Columns: []string{snippet.SharesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(share.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {

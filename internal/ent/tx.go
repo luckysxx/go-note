@@ -12,12 +12,24 @@ import (
 // Tx is a transactional client that is created by calling Client.Tx().
 type Tx struct {
 	config
+	// AICallLog is the client for interacting with the AICallLog builders.
+	AICallLog *AICallLogClient
+	// AIUsageDaily is the client for interacting with the AIUsageDaily builders.
+	AIUsageDaily *AIUsageDailyClient
 	// Group is the client for interacting with the Group builders.
 	Group *GroupClient
+	// Share is the client for interacting with the Share builders.
+	Share *ShareClient
 	// Snippet is the client for interacting with the Snippet builders.
 	Snippet *SnippetClient
+	// SnippetAIMetadata is the client for interacting with the SnippetAIMetadata builders.
+	SnippetAIMetadata *SnippetAIMetadataClient
+	// SnippetLineage is the client for interacting with the SnippetLineage builders.
+	SnippetLineage *SnippetLineageClient
 	// Tag is the client for interacting with the Tag builders.
 	Tag *TagClient
+	// Template is the client for interacting with the Template builders.
+	Template *TemplateClient
 
 	// lazily loaded.
 	client     *Client
@@ -149,9 +161,15 @@ func (tx *Tx) Client() *Client {
 }
 
 func (tx *Tx) init() {
+	tx.AICallLog = NewAICallLogClient(tx.config)
+	tx.AIUsageDaily = NewAIUsageDailyClient(tx.config)
 	tx.Group = NewGroupClient(tx.config)
+	tx.Share = NewShareClient(tx.config)
 	tx.Snippet = NewSnippetClient(tx.config)
+	tx.SnippetAIMetadata = NewSnippetAIMetadataClient(tx.config)
+	tx.SnippetLineage = NewSnippetLineageClient(tx.config)
 	tx.Tag = NewTagClient(tx.config)
+	tx.Template = NewTemplateClient(tx.config)
 }
 
 // txDriver wraps the given dialect.Tx with a nop dialect.Driver implementation.
@@ -161,7 +179,7 @@ func (tx *Tx) init() {
 // of them in order to commit or rollback the transaction.
 //
 // If a closed transaction is embedded in one of the generated entities, and the entity
-// applies a query, for example: Group.QueryXXX(), the query will be executed
+// applies a query, for example: AICallLog.QueryXXX(), the query will be executed
 // through the driver which created this transaction.
 //
 // Note that txDriver is not goroutine safe.

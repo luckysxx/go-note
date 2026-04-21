@@ -7,7 +7,14 @@ import (
 	commonlogger "github.com/luckysxx/common/logger"
 	"github.com/luckysxx/common/metrics"
 	notepb "github.com/luckysxx/common/proto/note"
-	"github.com/luckysxx/go-note/internal/service"
+	aimetadatarepo "github.com/luckysxx/go-note/internal/repository/aimetadata"
+	groupsvc "github.com/luckysxx/go-note/internal/service/group"
+	lineagesvc "github.com/luckysxx/go-note/internal/service/lineage"
+	sharesvc "github.com/luckysxx/go-note/internal/service/share"
+	snippetsvc "github.com/luckysxx/go-note/internal/service/snippet"
+	tagsvc "github.com/luckysxx/go-note/internal/service/tag"
+	templatesvc "github.com/luckysxx/go-note/internal/service/template"
+	uploadsvc "github.com/luckysxx/go-note/internal/service/upload"
 	"github.com/luckysxx/go-note/internal/transport/grpc/interceptor"
 	grpcserver "github.com/luckysxx/go-note/internal/transport/grpc/server"
 
@@ -20,11 +27,21 @@ import (
 
 // SetupServer 组装 gRPC Server（对标 HTTP 的 SetupRouter）
 func SetupServer(
-	snippetSvc service.SnippetService,
+	snippetSvc snippetsvc.SnippetService,
+	groupSvc groupsvc.GroupService,
+	tagSvc tagsvc.TagService,
+	templateSvc templatesvc.TemplateService,
+	lineageSvc lineagesvc.Service,
+	shareSvc sharesvc.Service,
+	uploadSvc uploadsvc.UploadService,
+	aimetadataRepo aimetadatarepo.Repository,
 	healthServer healthgrpc.HealthServer,
 	log *zap.Logger,
 ) *grpc.Server {
+	const maxMsgSize = 16 << 20 // 16 MB — 支持最大 10MB 文件上传 + protobuf 编码开销
+
 	s := grpc.NewServer(
+		grpc.MaxRecvMsgSize(maxMsgSize),
 		// ── Keepalive ────────────────────────────────────────
 		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
 			MinTime:             5 * time.Second,
@@ -46,7 +63,7 @@ func SetupServer(
 		),
 	)
 
-	notepb.RegisterNoteServiceServer(s, grpcserver.NewNoteServer(snippetSvc, log))
+	notepb.RegisterNoteServiceServer(s, grpcserver.NewNoteServer(snippetSvc, groupSvc, tagSvc, templateSvc, lineageSvc, shareSvc, uploadSvc, aimetadataRepo, log))
 	healthgrpc.RegisterHealthServer(s, healthServer)
 
 	return s

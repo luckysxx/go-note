@@ -5,7 +5,7 @@
 ### 前置条件
 
 - PostgreSQL 和 Redis 已启动（通过 `docker-compose-infra.yaml` 启动公共基础设施）
-- user-platform gRPC 服务运行在 `localhost:9091`
+- id-generator 服务可访问
 
 ### 运行步骤
 
@@ -22,12 +22,16 @@ cp .env.example .env
 make run
 ```
 
-Ent 会在启动时自动执行 schema migration（`auto_migrate: true`），无需手动建表。
+`make run` 现在默认启动 go-note 单主进程入口，同时监听：
+
+- HTTP: `:8080`
+- gRPC: `:9093`
 
 3. **访问服务**
 
 - go-note API: `http://localhost:8080`
-- 健康检查: `http://localhost:8080/health`
+- 健康检查: `http://localhost:8080/healthz`
+- 就绪检查: `http://localhost:8080/readyz`
 
 ---
 
@@ -61,18 +65,16 @@ make docker-up
 4. **访问服务**
 
 - go-note API: `http://localhost:8080`
-- 前端: `http://localhost:8082`
+- go-note gRPC: `localhost:9093`（容器网络内）
 
 ### 配置说明
 
-环境变量在 `docker-compose.yaml` 中定义，关键配置：
+Docker Compose 通过 `.env` + `environment` 注入配置，关键变量包括：
 
-```yaml
-environment:
-  - DATABASE_SOURCE=postgres://luckys:123456@global-postgres:5432/go_note?sslmode=disable
-  - REDIS_ADDR=global-redis:6379
-  - USER_PLATFORM_ADDR=user-platform:9091
-```
+- `DATABASE_SOURCE`
+- `REDIS_ADDR`
+- `REDIS_PASSWORD`
+- `GRPC_SERVER_PORT`
 
 ---
 
@@ -82,29 +84,22 @@ environment:
 | ------------------------ | ------------------ | ------------- |
 | `APP_ENV`                | 运行环境           | `development` |
 | `SERVER_PORT`            | HTTP 端口          | `8080`        |
+| `GRPC_SERVER_PORT`       | gRPC 端口          | `9093`        |
 | `DATABASE_DRIVER`        | 数据库驱动         | `postgres`    |
 | `DATABASE_SOURCE`        | 数据库连接串       | `.env` 中设置 |
-| `DATABASE_AUTO_MIGRATE`  | 自动建表           | `true`        |
+| `DATABASE_AUTO_MIGRATE`  | 是否自动建表       | `.env` 中设置 |
 | `REDIS_ADDR`             | Redis 地址         | `localhost:6379` |
 | `REDIS_PASSWORD`         | Redis 密码         | `.env` 中设置 |
-| `USER_PLATFORM_ADDR`     | user-platform gRPC 地址 | `localhost:9091` |
+| `METRICS_PORT`           | 兼容旧 gRPC 旁路探针端口配置 | `9094` |
 
 ---
 
 ## 常见问题
 
-### Q: 启动报 "连接 user-platform gRPC 失败"
-
-A: 确保 user-platform 的 gRPC 服务已启动并监听在配置的地址（默认 `localhost:9091`）。
-
 ### Q: 数据库表不存在
 
-A: 检查 `configs/config.yaml` 中 `database.auto_migrate` 是否为 `true`。Ent 会在启动时自动创建表。
+A: 检查 `.env` 中 `DATABASE_AUTO_MIGRATE` 是否开启，以及 `DATABASE_SOURCE` 是否正确。Ent 会在启动时自动创建表。
 
-### Q: Token 验证失败
+### Q: 为什么既有 8080 又有 9093
 
-A: go-note 通过 gRPC 调用 user-platform 验证 Token。请确认：
-
-1. 使用的是 user-platform 签发的有效 Token
-2. user-platform gRPC 服务正常运行
-3. `USER_PLATFORM_ADDR` 配置正确
+A: `8080` 是 go-note 的 HTTP 入口，承接 grpc-gateway 和少量 HTTP-only 路由；`9093` 是内部 gRPC 入口，供 api-gateway 或其他服务调用。

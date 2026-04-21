@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
@@ -19,8 +20,22 @@ import (
 	"github.com/luckysxx/go-note/internal/platform/config"
 	"github.com/luckysxx/go-note/internal/platform/database"
 	platformidgen "github.com/luckysxx/go-note/internal/platform/idgen"
-	"github.com/luckysxx/go-note/internal/repository"
-	"github.com/luckysxx/go-note/internal/service"
+	"github.com/luckysxx/go-note/internal/platform/storage"
+	aimetadatarepo "github.com/luckysxx/go-note/internal/repository/aimetadata"
+	groupsvc "github.com/luckysxx/go-note/internal/service/group"
+	lineagesvc "github.com/luckysxx/go-note/internal/service/lineage"
+	sharesvc "github.com/luckysxx/go-note/internal/service/share"
+	snippetsvc "github.com/luckysxx/go-note/internal/service/snippet"
+	tagsvc "github.com/luckysxx/go-note/internal/service/tag"
+	templatesvc "github.com/luckysxx/go-note/internal/service/template"
+	uploadsvc "github.com/luckysxx/go-note/internal/service/upload"
+	aimetadatastore "github.com/luckysxx/go-note/internal/store/entstore/aimetadata"
+	groupstore "github.com/luckysxx/go-note/internal/store/entstore/group"
+	lineagestore "github.com/luckysxx/go-note/internal/store/entstore/lineage"
+	sharestore "github.com/luckysxx/go-note/internal/store/entstore/share"
+	snippetstore "github.com/luckysxx/go-note/internal/store/entstore/snippet"
+	tagstore "github.com/luckysxx/go-note/internal/store/entstore/tag"
+	templatestore "github.com/luckysxx/go-note/internal/store/entstore/template"
 	transportgrpc "github.com/luckysxx/go-note/internal/transport/grpc"
 
 	"go.uber.org/zap"
@@ -61,8 +76,14 @@ func main() {
 	)
 	defer probeShutdown()
 
-	snippetSvc := buildServices(entClient, idgenClient, log)
-	grpcServer := transportgrpc.SetupServer(snippetSvc, grpcHealthServer, log)
+	snippetSvc, groupSvc, tagSvc, templateSvc, lineageSvc, shareSvc, uploadSvc, aimetadataRepo := buildServices(cfg, entClient, idgenClient, log)
+
+	// Seed 系统预置模板（幂等）
+	if err := templateSvc.SeedSystemTemplates(context.Background()); err != nil {
+		log.Error("seed 系统模板失败", zap.Error(err))
+	}
+
+	grpcServer := transportgrpc.SetupServer(snippetSvc, groupSvc, tagSvc, templateSvc, lineageSvc, shareSvc, uploadSvc, aimetadataRepo, grpcHealthServer, log)
 
 	runServer(grpcServer, grpcHealthServer, cfg.GRPCServer.Port, log)
 }
@@ -78,9 +99,44 @@ func initInfra(cfg *config.Config, log *zap.Logger) (*ent.Client, *redis.Client,
 	return entClient, redisClient, idgenClient
 }
 
-func buildServices(entClient *ent.Client, idgenClient platformidgen.Client, log *zap.Logger) service.SnippetService {
-	snippetRepo := repository.NewSnippetRepository(entClient)
-	return service.NewSnippetService(snippetRepo, idgenClient, log)
+func buildServices(
+	cfg *config.Config,
+	entClient *ent.Client,
+	idgenClient platformidgen.Client,
+	log *zap.Logger,
+) (snippetsvc.SnippetService, groupsvc.GroupService, tagsvc.TagService, templatesvc.TemplateService, lineagesvc.Service, sharesvc.Service, uploadsvc.UploadService, aimetadatarepo.Repository) {
+	snippetRepo := snippetstore.New(entClient)
+	aimetadataRepo := aimetadatastore.New(entClient)
+	groupRepo := groupstore.New(entClient)
+	tagRepo := tagstore.New(entClient)
+	templateRepo := templatestore.New(entClient)
+	lineageRepo := lineagestore.New(entClient)
+	shareRepo := sharestore.New(entClient)
+
+	minioStorage, err := storage.NewMinIOStorage(storage.MinIOConfig{
+		Endpoint:       cfg.MinIO.Endpoint,
+		PublicEndpoint: cfg.MinIO.PublicEndpoint,
+		AccessKey:      cfg.MinIO.AccessKey,
+		SecretKey:      cfg.MinIO.SecretKey,
+		Bucket:         cfg.MinIO.Bucket,
+		UseSSL:         cfg.MinIO.UseSSL,
+	})
+	if err != nil {
+		log.Fatal("初始化 MinIO 客户端失败", zap.Error(err))
+	}
+
+	return snippetsvc.NewSnippetService(snippetRepo, tagRepo, idgenClient, nil, log),
+		groupsvc.NewGroupService(groupRepo, idgenClient, log),
+		tagsvc.NewTagService(tagRepo, idgenClient, log),
+		templatesvc.NewTemplateService(templateRepo, idgenClient, log),
+		lineagesvc.NewService(lineageRepo, idgenClient, log),
+		sharesvc.NewService(shareRepo, snippetRepo, idgenClient, log),
+		uploadsvc.NewUploadService(minioStorage, uploadsvc.Options{
+			PresignExpiry: time.Duration(cfg.MinIO.PresignExpiry) * time.Second,
+			MaxFileSize:   cfg.MinIO.MaxUploadSize,
+			AllowedMIMEs:  cfg.MinIO.AllowedMIMEs,
+		}, log),
+		aimetadataRepo
 }
 
 func runServer(s *grpc.Server, healthServer *grpchealth.Server, port string, log *zap.Logger) {

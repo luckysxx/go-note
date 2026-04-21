@@ -21,7 +21,11 @@ type grpcClient struct {
 
 // New 创建一个基于 gRPC 的 ID 生成器客户端。
 func New(addr string) (Client, error) {
-	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(
+		addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultServiceConfig(`{"loadBalancingConfig": [{"round_robin": {}}]}`),
+	)
 	if err != nil {
 		return nil, err
 	}

@@ -14,6 +14,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/luckysxx/go-note/internal/ent/group"
 	"github.com/luckysxx/go-note/internal/ent/predicate"
+	"github.com/luckysxx/go-note/internal/ent/share"
 	"github.com/luckysxx/go-note/internal/ent/snippet"
 	"github.com/luckysxx/go-note/internal/ent/tag"
 )
@@ -27,6 +28,7 @@ type SnippetQuery struct {
 	predicates []predicate.Snippet
 	withGroup  *GroupQuery
 	withTags   *TagQuery
+	withShares *ShareQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -100,6 +102,28 @@ func (_q *SnippetQuery) QueryTags() *TagQuery {
 			sqlgraph.From(snippet.Table, snippet.FieldID, selector),
 			sqlgraph.To(tag.Table, tag.FieldID),
 			sqlgraph.Edge(sqlgraph.M2M, false, snippet.TagsTable, snippet.TagsPrimaryKey...),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryShares chains the current query on the "shares" edge.
+func (_q *SnippetQuery) QueryShares() *ShareQuery {
+	query := (&ShareClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(snippet.Table, snippet.FieldID, selector),
+			sqlgraph.To(share.Table, share.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, snippet.SharesTable, snippet.SharesColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -301,6 +325,7 @@ func (_q *SnippetQuery) Clone() *SnippetQuery {
 		predicates: append([]predicate.Snippet{}, _q.predicates...),
 		withGroup:  _q.withGroup.Clone(),
 		withTags:   _q.withTags.Clone(),
+		withShares: _q.withShares.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -326,6 +351,17 @@ func (_q *SnippetQuery) WithTags(opts ...func(*TagQuery)) *SnippetQuery {
 		opt(query)
 	}
 	_q.withTags = query
+	return _q
+}
+
+// WithShares tells the query-builder to eager-load the nodes that are connected to
+// the "shares" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *SnippetQuery) WithShares(opts ...func(*ShareQuery)) *SnippetQuery {
+	query := (&ShareClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withShares = query
 	return _q
 }
 
@@ -407,9 +443,10 @@ func (_q *SnippetQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Snip
 	var (
 		nodes       = []*Snippet{}
 		_spec       = _q.querySpec()
-		loadedTypes = [2]bool{
+		loadedTypes = [3]bool{
 			_q.withGroup != nil,
 			_q.withTags != nil,
+			_q.withShares != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -440,6 +477,13 @@ func (_q *SnippetQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Snip
 		if err := _q.loadTags(ctx, query, nodes,
 			func(n *Snippet) { n.Edges.Tags = []*Tag{} },
 			func(n *Snippet, e *Tag) { n.Edges.Tags = append(n.Edges.Tags, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withShares; query != nil {
+		if err := _q.loadShares(ctx, query, nodes,
+			func(n *Snippet) { n.Edges.Shares = []*Share{} },
+			func(n *Snippet, e *Share) { n.Edges.Shares = append(n.Edges.Shares, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -536,6 +580,36 @@ func (_q *SnippetQuery) loadTags(ctx context.Context, query *TagQuery, nodes []*
 		for kn := range nodes {
 			assign(kn, n)
 		}
+	}
+	return nil
+}
+func (_q *SnippetQuery) loadShares(ctx context.Context, query *ShareQuery, nodes []*Snippet, init func(*Snippet), assign func(*Snippet, *Share)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int64]*Snippet)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(share.FieldSnippetID)
+	}
+	query.Where(predicate.Share(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(snippet.SharesColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.SnippetID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "snippet_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
 	}
 	return nil
 }

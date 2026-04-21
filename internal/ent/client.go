@@ -15,9 +15,15 @@ import (
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/luckysxx/go-note/internal/ent/aicalllog"
+	"github.com/luckysxx/go-note/internal/ent/aiusagedaily"
 	"github.com/luckysxx/go-note/internal/ent/group"
+	"github.com/luckysxx/go-note/internal/ent/share"
 	"github.com/luckysxx/go-note/internal/ent/snippet"
+	"github.com/luckysxx/go-note/internal/ent/snippetaimetadata"
+	"github.com/luckysxx/go-note/internal/ent/snippetlineage"
 	"github.com/luckysxx/go-note/internal/ent/tag"
+	"github.com/luckysxx/go-note/internal/ent/template"
 )
 
 // Client is the client that holds all ent builders.
@@ -25,12 +31,24 @@ type Client struct {
 	config
 	// Schema is the client for creating, migrating and dropping schema.
 	Schema *migrate.Schema
+	// AICallLog is the client for interacting with the AICallLog builders.
+	AICallLog *AICallLogClient
+	// AIUsageDaily is the client for interacting with the AIUsageDaily builders.
+	AIUsageDaily *AIUsageDailyClient
 	// Group is the client for interacting with the Group builders.
 	Group *GroupClient
+	// Share is the client for interacting with the Share builders.
+	Share *ShareClient
 	// Snippet is the client for interacting with the Snippet builders.
 	Snippet *SnippetClient
+	// SnippetAIMetadata is the client for interacting with the SnippetAIMetadata builders.
+	SnippetAIMetadata *SnippetAIMetadataClient
+	// SnippetLineage is the client for interacting with the SnippetLineage builders.
+	SnippetLineage *SnippetLineageClient
 	// Tag is the client for interacting with the Tag builders.
 	Tag *TagClient
+	// Template is the client for interacting with the Template builders.
+	Template *TemplateClient
 }
 
 // NewClient creates a new client configured with the given options.
@@ -42,9 +60,15 @@ func NewClient(opts ...Option) *Client {
 
 func (c *Client) init() {
 	c.Schema = migrate.NewSchema(c.driver)
+	c.AICallLog = NewAICallLogClient(c.config)
+	c.AIUsageDaily = NewAIUsageDailyClient(c.config)
 	c.Group = NewGroupClient(c.config)
+	c.Share = NewShareClient(c.config)
 	c.Snippet = NewSnippetClient(c.config)
+	c.SnippetAIMetadata = NewSnippetAIMetadataClient(c.config)
+	c.SnippetLineage = NewSnippetLineageClient(c.config)
 	c.Tag = NewTagClient(c.config)
+	c.Template = NewTemplateClient(c.config)
 }
 
 type (
@@ -135,11 +159,17 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 	cfg := c.config
 	cfg.driver = tx
 	return &Tx{
-		ctx:     ctx,
-		config:  cfg,
-		Group:   NewGroupClient(cfg),
-		Snippet: NewSnippetClient(cfg),
-		Tag:     NewTagClient(cfg),
+		ctx:               ctx,
+		config:            cfg,
+		AICallLog:         NewAICallLogClient(cfg),
+		AIUsageDaily:      NewAIUsageDailyClient(cfg),
+		Group:             NewGroupClient(cfg),
+		Share:             NewShareClient(cfg),
+		Snippet:           NewSnippetClient(cfg),
+		SnippetAIMetadata: NewSnippetAIMetadataClient(cfg),
+		SnippetLineage:    NewSnippetLineageClient(cfg),
+		Tag:               NewTagClient(cfg),
+		Template:          NewTemplateClient(cfg),
 	}, nil
 }
 
@@ -157,18 +187,24 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 	cfg := c.config
 	cfg.driver = &txDriver{tx: tx, drv: c.driver}
 	return &Tx{
-		ctx:     ctx,
-		config:  cfg,
-		Group:   NewGroupClient(cfg),
-		Snippet: NewSnippetClient(cfg),
-		Tag:     NewTagClient(cfg),
+		ctx:               ctx,
+		config:            cfg,
+		AICallLog:         NewAICallLogClient(cfg),
+		AIUsageDaily:      NewAIUsageDailyClient(cfg),
+		Group:             NewGroupClient(cfg),
+		Share:             NewShareClient(cfg),
+		Snippet:           NewSnippetClient(cfg),
+		SnippetAIMetadata: NewSnippetAIMetadataClient(cfg),
+		SnippetLineage:    NewSnippetLineageClient(cfg),
+		Tag:               NewTagClient(cfg),
+		Template:          NewTemplateClient(cfg),
 	}, nil
 }
 
 // Debug returns a new debug-client. It's used to get verbose logging on specific operations.
 //
 //	client.Debug().
-//		Group.
+//		AICallLog.
 //		Query().
 //		Count(ctx)
 func (c *Client) Debug() *Client {
@@ -190,30 +226,314 @@ func (c *Client) Close() error {
 // Use adds the mutation hooks to all the entity clients.
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
-	c.Group.Use(hooks...)
-	c.Snippet.Use(hooks...)
-	c.Tag.Use(hooks...)
+	for _, n := range []interface{ Use(...Hook) }{
+		c.AICallLog, c.AIUsageDaily, c.Group, c.Share, c.Snippet, c.SnippetAIMetadata,
+		c.SnippetLineage, c.Tag, c.Template,
+	} {
+		n.Use(hooks...)
+	}
 }
 
 // Intercept adds the query interceptors to all the entity clients.
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
-	c.Group.Intercept(interceptors...)
-	c.Snippet.Intercept(interceptors...)
-	c.Tag.Intercept(interceptors...)
+	for _, n := range []interface{ Intercept(...Interceptor) }{
+		c.AICallLog, c.AIUsageDaily, c.Group, c.Share, c.Snippet, c.SnippetAIMetadata,
+		c.SnippetLineage, c.Tag, c.Template,
+	} {
+		n.Intercept(interceptors...)
+	}
 }
 
 // Mutate implements the ent.Mutator interface.
 func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 	switch m := m.(type) {
+	case *AICallLogMutation:
+		return c.AICallLog.mutate(ctx, m)
+	case *AIUsageDailyMutation:
+		return c.AIUsageDaily.mutate(ctx, m)
 	case *GroupMutation:
 		return c.Group.mutate(ctx, m)
+	case *ShareMutation:
+		return c.Share.mutate(ctx, m)
 	case *SnippetMutation:
 		return c.Snippet.mutate(ctx, m)
+	case *SnippetAIMetadataMutation:
+		return c.SnippetAIMetadata.mutate(ctx, m)
+	case *SnippetLineageMutation:
+		return c.SnippetLineage.mutate(ctx, m)
 	case *TagMutation:
 		return c.Tag.mutate(ctx, m)
+	case *TemplateMutation:
+		return c.Template.mutate(ctx, m)
 	default:
 		return nil, fmt.Errorf("ent: unknown mutation type %T", m)
+	}
+}
+
+// AICallLogClient is a client for the AICallLog schema.
+type AICallLogClient struct {
+	config
+}
+
+// NewAICallLogClient returns a client for the AICallLog from the given config.
+func NewAICallLogClient(c config) *AICallLogClient {
+	return &AICallLogClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `aicalllog.Hooks(f(g(h())))`.
+func (c *AICallLogClient) Use(hooks ...Hook) {
+	c.hooks.AICallLog = append(c.hooks.AICallLog, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `aicalllog.Intercept(f(g(h())))`.
+func (c *AICallLogClient) Intercept(interceptors ...Interceptor) {
+	c.inters.AICallLog = append(c.inters.AICallLog, interceptors...)
+}
+
+// Create returns a builder for creating a AICallLog entity.
+func (c *AICallLogClient) Create() *AICallLogCreate {
+	mutation := newAICallLogMutation(c.config, OpCreate)
+	return &AICallLogCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of AICallLog entities.
+func (c *AICallLogClient) CreateBulk(builders ...*AICallLogCreate) *AICallLogCreateBulk {
+	return &AICallLogCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *AICallLogClient) MapCreateBulk(slice any, setFunc func(*AICallLogCreate, int)) *AICallLogCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &AICallLogCreateBulk{err: fmt.Errorf("calling to AICallLogClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*AICallLogCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &AICallLogCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for AICallLog.
+func (c *AICallLogClient) Update() *AICallLogUpdate {
+	mutation := newAICallLogMutation(c.config, OpUpdate)
+	return &AICallLogUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *AICallLogClient) UpdateOne(_m *AICallLog) *AICallLogUpdateOne {
+	mutation := newAICallLogMutation(c.config, OpUpdateOne, withAICallLog(_m))
+	return &AICallLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *AICallLogClient) UpdateOneID(id int64) *AICallLogUpdateOne {
+	mutation := newAICallLogMutation(c.config, OpUpdateOne, withAICallLogID(id))
+	return &AICallLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for AICallLog.
+func (c *AICallLogClient) Delete() *AICallLogDelete {
+	mutation := newAICallLogMutation(c.config, OpDelete)
+	return &AICallLogDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *AICallLogClient) DeleteOne(_m *AICallLog) *AICallLogDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *AICallLogClient) DeleteOneID(id int64) *AICallLogDeleteOne {
+	builder := c.Delete().Where(aicalllog.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &AICallLogDeleteOne{builder}
+}
+
+// Query returns a query builder for AICallLog.
+func (c *AICallLogClient) Query() *AICallLogQuery {
+	return &AICallLogQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeAICallLog},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a AICallLog entity by its id.
+func (c *AICallLogClient) Get(ctx context.Context, id int64) (*AICallLog, error) {
+	return c.Query().Where(aicalllog.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *AICallLogClient) GetX(ctx context.Context, id int64) *AICallLog {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *AICallLogClient) Hooks() []Hook {
+	return c.hooks.AICallLog
+}
+
+// Interceptors returns the client interceptors.
+func (c *AICallLogClient) Interceptors() []Interceptor {
+	return c.inters.AICallLog
+}
+
+func (c *AICallLogClient) mutate(ctx context.Context, m *AICallLogMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&AICallLogCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&AICallLogUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&AICallLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&AICallLogDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown AICallLog mutation op: %q", m.Op())
+	}
+}
+
+// AIUsageDailyClient is a client for the AIUsageDaily schema.
+type AIUsageDailyClient struct {
+	config
+}
+
+// NewAIUsageDailyClient returns a client for the AIUsageDaily from the given config.
+func NewAIUsageDailyClient(c config) *AIUsageDailyClient {
+	return &AIUsageDailyClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `aiusagedaily.Hooks(f(g(h())))`.
+func (c *AIUsageDailyClient) Use(hooks ...Hook) {
+	c.hooks.AIUsageDaily = append(c.hooks.AIUsageDaily, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `aiusagedaily.Intercept(f(g(h())))`.
+func (c *AIUsageDailyClient) Intercept(interceptors ...Interceptor) {
+	c.inters.AIUsageDaily = append(c.inters.AIUsageDaily, interceptors...)
+}
+
+// Create returns a builder for creating a AIUsageDaily entity.
+func (c *AIUsageDailyClient) Create() *AIUsageDailyCreate {
+	mutation := newAIUsageDailyMutation(c.config, OpCreate)
+	return &AIUsageDailyCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of AIUsageDaily entities.
+func (c *AIUsageDailyClient) CreateBulk(builders ...*AIUsageDailyCreate) *AIUsageDailyCreateBulk {
+	return &AIUsageDailyCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *AIUsageDailyClient) MapCreateBulk(slice any, setFunc func(*AIUsageDailyCreate, int)) *AIUsageDailyCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &AIUsageDailyCreateBulk{err: fmt.Errorf("calling to AIUsageDailyClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*AIUsageDailyCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &AIUsageDailyCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for AIUsageDaily.
+func (c *AIUsageDailyClient) Update() *AIUsageDailyUpdate {
+	mutation := newAIUsageDailyMutation(c.config, OpUpdate)
+	return &AIUsageDailyUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *AIUsageDailyClient) UpdateOne(_m *AIUsageDaily) *AIUsageDailyUpdateOne {
+	mutation := newAIUsageDailyMutation(c.config, OpUpdateOne, withAIUsageDaily(_m))
+	return &AIUsageDailyUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *AIUsageDailyClient) UpdateOneID(id int64) *AIUsageDailyUpdateOne {
+	mutation := newAIUsageDailyMutation(c.config, OpUpdateOne, withAIUsageDailyID(id))
+	return &AIUsageDailyUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for AIUsageDaily.
+func (c *AIUsageDailyClient) Delete() *AIUsageDailyDelete {
+	mutation := newAIUsageDailyMutation(c.config, OpDelete)
+	return &AIUsageDailyDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *AIUsageDailyClient) DeleteOne(_m *AIUsageDaily) *AIUsageDailyDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *AIUsageDailyClient) DeleteOneID(id int64) *AIUsageDailyDeleteOne {
+	builder := c.Delete().Where(aiusagedaily.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &AIUsageDailyDeleteOne{builder}
+}
+
+// Query returns a query builder for AIUsageDaily.
+func (c *AIUsageDailyClient) Query() *AIUsageDailyQuery {
+	return &AIUsageDailyQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeAIUsageDaily},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a AIUsageDaily entity by its id.
+func (c *AIUsageDailyClient) Get(ctx context.Context, id int64) (*AIUsageDaily, error) {
+	return c.Query().Where(aiusagedaily.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *AIUsageDailyClient) GetX(ctx context.Context, id int64) *AIUsageDaily {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *AIUsageDailyClient) Hooks() []Hook {
+	return c.hooks.AIUsageDaily
+}
+
+// Interceptors returns the client interceptors.
+func (c *AIUsageDailyClient) Interceptors() []Interceptor {
+	return c.inters.AIUsageDaily
+}
+
+func (c *AIUsageDailyClient) mutate(ctx context.Context, m *AIUsageDailyMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&AIUsageDailyCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&AIUsageDailyUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&AIUsageDailyUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&AIUsageDailyDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown AIUsageDaily mutation op: %q", m.Op())
 	}
 }
 
@@ -341,6 +661,38 @@ func (c *GroupClient) QuerySnippets(_m *Group) *SnippetQuery {
 	return query
 }
 
+// QueryParent queries the parent edge of a Group.
+func (c *GroupClient) QueryParent(_m *Group) *GroupQuery {
+	query := (&GroupClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(group.Table, group.FieldID, id),
+			sqlgraph.To(group.Table, group.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, group.ParentTable, group.ParentColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryChildren queries the children edge of a Group.
+func (c *GroupClient) QueryChildren(_m *Group) *GroupQuery {
+	query := (&GroupClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(group.Table, group.FieldID, id),
+			sqlgraph.To(group.Table, group.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, group.ChildrenTable, group.ChildrenColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *GroupClient) Hooks() []Hook {
 	return c.hooks.Group
@@ -363,6 +715,155 @@ func (c *GroupClient) mutate(ctx context.Context, m *GroupMutation) (Value, erro
 		return (&GroupDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Group mutation op: %q", m.Op())
+	}
+}
+
+// ShareClient is a client for the Share schema.
+type ShareClient struct {
+	config
+}
+
+// NewShareClient returns a client for the Share from the given config.
+func NewShareClient(c config) *ShareClient {
+	return &ShareClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `share.Hooks(f(g(h())))`.
+func (c *ShareClient) Use(hooks ...Hook) {
+	c.hooks.Share = append(c.hooks.Share, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `share.Intercept(f(g(h())))`.
+func (c *ShareClient) Intercept(interceptors ...Interceptor) {
+	c.inters.Share = append(c.inters.Share, interceptors...)
+}
+
+// Create returns a builder for creating a Share entity.
+func (c *ShareClient) Create() *ShareCreate {
+	mutation := newShareMutation(c.config, OpCreate)
+	return &ShareCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of Share entities.
+func (c *ShareClient) CreateBulk(builders ...*ShareCreate) *ShareCreateBulk {
+	return &ShareCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ShareClient) MapCreateBulk(slice any, setFunc func(*ShareCreate, int)) *ShareCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ShareCreateBulk{err: fmt.Errorf("calling to ShareClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ShareCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ShareCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for Share.
+func (c *ShareClient) Update() *ShareUpdate {
+	mutation := newShareMutation(c.config, OpUpdate)
+	return &ShareUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ShareClient) UpdateOne(_m *Share) *ShareUpdateOne {
+	mutation := newShareMutation(c.config, OpUpdateOne, withShare(_m))
+	return &ShareUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ShareClient) UpdateOneID(id int64) *ShareUpdateOne {
+	mutation := newShareMutation(c.config, OpUpdateOne, withShareID(id))
+	return &ShareUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for Share.
+func (c *ShareClient) Delete() *ShareDelete {
+	mutation := newShareMutation(c.config, OpDelete)
+	return &ShareDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ShareClient) DeleteOne(_m *Share) *ShareDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ShareClient) DeleteOneID(id int64) *ShareDeleteOne {
+	builder := c.Delete().Where(share.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ShareDeleteOne{builder}
+}
+
+// Query returns a query builder for Share.
+func (c *ShareClient) Query() *ShareQuery {
+	return &ShareQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeShare},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a Share entity by its id.
+func (c *ShareClient) Get(ctx context.Context, id int64) (*Share, error) {
+	return c.Query().Where(share.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ShareClient) GetX(ctx context.Context, id int64) *Share {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QuerySnippet queries the snippet edge of a Share.
+func (c *ShareClient) QuerySnippet(_m *Share) *SnippetQuery {
+	query := (&SnippetClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(share.Table, share.FieldID, id),
+			sqlgraph.To(snippet.Table, snippet.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, share.SnippetTable, share.SnippetColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ShareClient) Hooks() []Hook {
+	return c.hooks.Share
+}
+
+// Interceptors returns the client interceptors.
+func (c *ShareClient) Interceptors() []Interceptor {
+	return c.inters.Share
+}
+
+func (c *ShareClient) mutate(ctx context.Context, m *ShareMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ShareCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ShareUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ShareUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ShareDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown Share mutation op: %q", m.Op())
 	}
 }
 
@@ -506,6 +1007,22 @@ func (c *SnippetClient) QueryTags(_m *Snippet) *TagQuery {
 	return query
 }
 
+// QueryShares queries the shares edge of a Snippet.
+func (c *SnippetClient) QueryShares(_m *Snippet) *ShareQuery {
+	query := (&ShareClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(snippet.Table, snippet.FieldID, id),
+			sqlgraph.To(share.Table, share.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, snippet.SharesTable, snippet.SharesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *SnippetClient) Hooks() []Hook {
 	return c.hooks.Snippet
@@ -528,6 +1045,272 @@ func (c *SnippetClient) mutate(ctx context.Context, m *SnippetMutation) (Value, 
 		return (&SnippetDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Snippet mutation op: %q", m.Op())
+	}
+}
+
+// SnippetAIMetadataClient is a client for the SnippetAIMetadata schema.
+type SnippetAIMetadataClient struct {
+	config
+}
+
+// NewSnippetAIMetadataClient returns a client for the SnippetAIMetadata from the given config.
+func NewSnippetAIMetadataClient(c config) *SnippetAIMetadataClient {
+	return &SnippetAIMetadataClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `snippetaimetadata.Hooks(f(g(h())))`.
+func (c *SnippetAIMetadataClient) Use(hooks ...Hook) {
+	c.hooks.SnippetAIMetadata = append(c.hooks.SnippetAIMetadata, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `snippetaimetadata.Intercept(f(g(h())))`.
+func (c *SnippetAIMetadataClient) Intercept(interceptors ...Interceptor) {
+	c.inters.SnippetAIMetadata = append(c.inters.SnippetAIMetadata, interceptors...)
+}
+
+// Create returns a builder for creating a SnippetAIMetadata entity.
+func (c *SnippetAIMetadataClient) Create() *SnippetAIMetadataCreate {
+	mutation := newSnippetAIMetadataMutation(c.config, OpCreate)
+	return &SnippetAIMetadataCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of SnippetAIMetadata entities.
+func (c *SnippetAIMetadataClient) CreateBulk(builders ...*SnippetAIMetadataCreate) *SnippetAIMetadataCreateBulk {
+	return &SnippetAIMetadataCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *SnippetAIMetadataClient) MapCreateBulk(slice any, setFunc func(*SnippetAIMetadataCreate, int)) *SnippetAIMetadataCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &SnippetAIMetadataCreateBulk{err: fmt.Errorf("calling to SnippetAIMetadataClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*SnippetAIMetadataCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &SnippetAIMetadataCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for SnippetAIMetadata.
+func (c *SnippetAIMetadataClient) Update() *SnippetAIMetadataUpdate {
+	mutation := newSnippetAIMetadataMutation(c.config, OpUpdate)
+	return &SnippetAIMetadataUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *SnippetAIMetadataClient) UpdateOne(_m *SnippetAIMetadata) *SnippetAIMetadataUpdateOne {
+	mutation := newSnippetAIMetadataMutation(c.config, OpUpdateOne, withSnippetAIMetadata(_m))
+	return &SnippetAIMetadataUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *SnippetAIMetadataClient) UpdateOneID(id int64) *SnippetAIMetadataUpdateOne {
+	mutation := newSnippetAIMetadataMutation(c.config, OpUpdateOne, withSnippetAIMetadataID(id))
+	return &SnippetAIMetadataUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for SnippetAIMetadata.
+func (c *SnippetAIMetadataClient) Delete() *SnippetAIMetadataDelete {
+	mutation := newSnippetAIMetadataMutation(c.config, OpDelete)
+	return &SnippetAIMetadataDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *SnippetAIMetadataClient) DeleteOne(_m *SnippetAIMetadata) *SnippetAIMetadataDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *SnippetAIMetadataClient) DeleteOneID(id int64) *SnippetAIMetadataDeleteOne {
+	builder := c.Delete().Where(snippetaimetadata.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &SnippetAIMetadataDeleteOne{builder}
+}
+
+// Query returns a query builder for SnippetAIMetadata.
+func (c *SnippetAIMetadataClient) Query() *SnippetAIMetadataQuery {
+	return &SnippetAIMetadataQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeSnippetAIMetadata},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a SnippetAIMetadata entity by its id.
+func (c *SnippetAIMetadataClient) Get(ctx context.Context, id int64) (*SnippetAIMetadata, error) {
+	return c.Query().Where(snippetaimetadata.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *SnippetAIMetadataClient) GetX(ctx context.Context, id int64) *SnippetAIMetadata {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *SnippetAIMetadataClient) Hooks() []Hook {
+	return c.hooks.SnippetAIMetadata
+}
+
+// Interceptors returns the client interceptors.
+func (c *SnippetAIMetadataClient) Interceptors() []Interceptor {
+	return c.inters.SnippetAIMetadata
+}
+
+func (c *SnippetAIMetadataClient) mutate(ctx context.Context, m *SnippetAIMetadataMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&SnippetAIMetadataCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&SnippetAIMetadataUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&SnippetAIMetadataUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&SnippetAIMetadataDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown SnippetAIMetadata mutation op: %q", m.Op())
+	}
+}
+
+// SnippetLineageClient is a client for the SnippetLineage schema.
+type SnippetLineageClient struct {
+	config
+}
+
+// NewSnippetLineageClient returns a client for the SnippetLineage from the given config.
+func NewSnippetLineageClient(c config) *SnippetLineageClient {
+	return &SnippetLineageClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `snippetlineage.Hooks(f(g(h())))`.
+func (c *SnippetLineageClient) Use(hooks ...Hook) {
+	c.hooks.SnippetLineage = append(c.hooks.SnippetLineage, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `snippetlineage.Intercept(f(g(h())))`.
+func (c *SnippetLineageClient) Intercept(interceptors ...Interceptor) {
+	c.inters.SnippetLineage = append(c.inters.SnippetLineage, interceptors...)
+}
+
+// Create returns a builder for creating a SnippetLineage entity.
+func (c *SnippetLineageClient) Create() *SnippetLineageCreate {
+	mutation := newSnippetLineageMutation(c.config, OpCreate)
+	return &SnippetLineageCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of SnippetLineage entities.
+func (c *SnippetLineageClient) CreateBulk(builders ...*SnippetLineageCreate) *SnippetLineageCreateBulk {
+	return &SnippetLineageCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *SnippetLineageClient) MapCreateBulk(slice any, setFunc func(*SnippetLineageCreate, int)) *SnippetLineageCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &SnippetLineageCreateBulk{err: fmt.Errorf("calling to SnippetLineageClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*SnippetLineageCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &SnippetLineageCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for SnippetLineage.
+func (c *SnippetLineageClient) Update() *SnippetLineageUpdate {
+	mutation := newSnippetLineageMutation(c.config, OpUpdate)
+	return &SnippetLineageUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *SnippetLineageClient) UpdateOne(_m *SnippetLineage) *SnippetLineageUpdateOne {
+	mutation := newSnippetLineageMutation(c.config, OpUpdateOne, withSnippetLineage(_m))
+	return &SnippetLineageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *SnippetLineageClient) UpdateOneID(id int64) *SnippetLineageUpdateOne {
+	mutation := newSnippetLineageMutation(c.config, OpUpdateOne, withSnippetLineageID(id))
+	return &SnippetLineageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for SnippetLineage.
+func (c *SnippetLineageClient) Delete() *SnippetLineageDelete {
+	mutation := newSnippetLineageMutation(c.config, OpDelete)
+	return &SnippetLineageDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *SnippetLineageClient) DeleteOne(_m *SnippetLineage) *SnippetLineageDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *SnippetLineageClient) DeleteOneID(id int64) *SnippetLineageDeleteOne {
+	builder := c.Delete().Where(snippetlineage.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &SnippetLineageDeleteOne{builder}
+}
+
+// Query returns a query builder for SnippetLineage.
+func (c *SnippetLineageClient) Query() *SnippetLineageQuery {
+	return &SnippetLineageQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeSnippetLineage},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a SnippetLineage entity by its id.
+func (c *SnippetLineageClient) Get(ctx context.Context, id int64) (*SnippetLineage, error) {
+	return c.Query().Where(snippetlineage.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *SnippetLineageClient) GetX(ctx context.Context, id int64) *SnippetLineage {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *SnippetLineageClient) Hooks() []Hook {
+	return c.hooks.SnippetLineage
+}
+
+// Interceptors returns the client interceptors.
+func (c *SnippetLineageClient) Interceptors() []Interceptor {
+	return c.inters.SnippetLineage
+}
+
+func (c *SnippetLineageClient) mutate(ctx context.Context, m *SnippetLineageMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&SnippetLineageCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&SnippetLineageUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&SnippetLineageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&SnippetLineageDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown SnippetLineage mutation op: %q", m.Op())
 	}
 }
 
@@ -680,12 +1463,147 @@ func (c *TagClient) mutate(ctx context.Context, m *TagMutation) (Value, error) {
 	}
 }
 
+// TemplateClient is a client for the Template schema.
+type TemplateClient struct {
+	config
+}
+
+// NewTemplateClient returns a client for the Template from the given config.
+func NewTemplateClient(c config) *TemplateClient {
+	return &TemplateClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `template.Hooks(f(g(h())))`.
+func (c *TemplateClient) Use(hooks ...Hook) {
+	c.hooks.Template = append(c.hooks.Template, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `template.Intercept(f(g(h())))`.
+func (c *TemplateClient) Intercept(interceptors ...Interceptor) {
+	c.inters.Template = append(c.inters.Template, interceptors...)
+}
+
+// Create returns a builder for creating a Template entity.
+func (c *TemplateClient) Create() *TemplateCreate {
+	mutation := newTemplateMutation(c.config, OpCreate)
+	return &TemplateCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of Template entities.
+func (c *TemplateClient) CreateBulk(builders ...*TemplateCreate) *TemplateCreateBulk {
+	return &TemplateCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *TemplateClient) MapCreateBulk(slice any, setFunc func(*TemplateCreate, int)) *TemplateCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &TemplateCreateBulk{err: fmt.Errorf("calling to TemplateClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*TemplateCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &TemplateCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for Template.
+func (c *TemplateClient) Update() *TemplateUpdate {
+	mutation := newTemplateMutation(c.config, OpUpdate)
+	return &TemplateUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *TemplateClient) UpdateOne(_m *Template) *TemplateUpdateOne {
+	mutation := newTemplateMutation(c.config, OpUpdateOne, withTemplate(_m))
+	return &TemplateUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *TemplateClient) UpdateOneID(id int64) *TemplateUpdateOne {
+	mutation := newTemplateMutation(c.config, OpUpdateOne, withTemplateID(id))
+	return &TemplateUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for Template.
+func (c *TemplateClient) Delete() *TemplateDelete {
+	mutation := newTemplateMutation(c.config, OpDelete)
+	return &TemplateDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *TemplateClient) DeleteOne(_m *Template) *TemplateDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *TemplateClient) DeleteOneID(id int64) *TemplateDeleteOne {
+	builder := c.Delete().Where(template.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &TemplateDeleteOne{builder}
+}
+
+// Query returns a query builder for Template.
+func (c *TemplateClient) Query() *TemplateQuery {
+	return &TemplateQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeTemplate},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a Template entity by its id.
+func (c *TemplateClient) Get(ctx context.Context, id int64) (*Template, error) {
+	return c.Query().Where(template.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *TemplateClient) GetX(ctx context.Context, id int64) *Template {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *TemplateClient) Hooks() []Hook {
+	return c.hooks.Template
+}
+
+// Interceptors returns the client interceptors.
+func (c *TemplateClient) Interceptors() []Interceptor {
+	return c.inters.Template
+}
+
+func (c *TemplateClient) mutate(ctx context.Context, m *TemplateMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&TemplateCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&TemplateUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&TemplateUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&TemplateDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown Template mutation op: %q", m.Op())
+	}
+}
+
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		Group, Snippet, Tag []ent.Hook
+		AICallLog, AIUsageDaily, Group, Share, Snippet, SnippetAIMetadata,
+		SnippetLineage, Tag, Template []ent.Hook
 	}
 	inters struct {
-		Group, Snippet, Tag []ent.Interceptor
+		AICallLog, AIUsageDaily, Group, Share, Snippet, SnippetAIMetadata,
+		SnippetLineage, Tag, Template []ent.Interceptor
 	}
 )

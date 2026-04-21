@@ -12,18 +12,23 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/luckysxx/common/probe"
 	"github.com/luckysxx/common/logger"
 	commonOtel "github.com/luckysxx/common/otel"
+	"github.com/luckysxx/common/probe"
 	commonRedis "github.com/luckysxx/common/redis"
 	"github.com/luckysxx/go-note/internal/ent"
 	"github.com/luckysxx/go-note/internal/platform/config"
 	"github.com/luckysxx/go-note/internal/platform/database"
 	platformidgen "github.com/luckysxx/go-note/internal/platform/idgen"
-	"github.com/luckysxx/go-note/internal/repository"
-	"github.com/luckysxx/go-note/internal/service"
-	"github.com/luckysxx/go-note/internal/transport/http/handler"
-	httprouter "github.com/luckysxx/go-note/internal/transport/http/router"
+	"github.com/luckysxx/go-note/internal/platform/storage"
+	groupsvc "github.com/luckysxx/go-note/internal/service/group"
+	sharesvc "github.com/luckysxx/go-note/internal/service/share"
+	uploadsvc "github.com/luckysxx/go-note/internal/service/upload"
+	groupstore "github.com/luckysxx/go-note/internal/store/entstore/group"
+	sharestore "github.com/luckysxx/go-note/internal/store/entstore/share"
+	snippetstore "github.com/luckysxx/go-note/internal/store/entstore/snippet"
+	"github.com/luckysxx/go-note/internal/transport/http/server/handler"
+	httprouter "github.com/luckysxx/go-note/internal/transport/http/server/router"
 	"go.uber.org/zap"
 )
 
@@ -70,14 +75,39 @@ func initInfra(cfg *config.Config, log *zap.Logger) (*ent.Client, *redis.Client,
 
 // buildRouter 依赖注入装配
 func buildRouter(cfg *config.Config, entClient *ent.Client, redisClient *redis.Client, idgenClient platformidgen.Client, log *zap.Logger) *gin.Engine {
-	// Repository
-	snippetRepo := repository.NewSnippetRepository(entClient)
+	// 存储层 / 仓储层
+	snippetRepo := snippetstore.New(entClient)
+	groupRepo := groupstore.New(entClient)
+	shareRepo := sharestore.New(entClient)
 
-	// Service
-	snippetSvc := service.NewSnippetService(snippetRepo, idgenClient, log)
+	// MinIO 对象存储
+	minioStorage, err := storage.NewMinIOStorage(storage.MinIOConfig{
+		Endpoint:       cfg.MinIO.Endpoint,
+		PublicEndpoint: cfg.MinIO.PublicEndpoint,
+		AccessKey:      cfg.MinIO.AccessKey,
+		SecretKey:      cfg.MinIO.SecretKey,
+		Bucket:         cfg.MinIO.Bucket,
+		UseSSL:         cfg.MinIO.UseSSL,
+	})
+	if err != nil {
+		log.Fatal("初始化 MinIO 客户端失败", zap.Error(err))
+	}
 
-	// Transport
-	snippetHandler := handler.NewSnippetHandler(snippetSvc, log)
+	// 服务层
+	groupSvc := groupsvc.NewGroupService(groupRepo, idgenClient, log)
+	shareSvc := sharesvc.NewService(shareRepo, snippetRepo, idgenClient, log)
+
+	uploadSvc := uploadsvc.NewUploadService(minioStorage, uploadsvc.Options{
+		PresignExpiry: time.Duration(cfg.MinIO.PresignExpiry) * time.Second,
+		MaxFileSize:   cfg.MinIO.MaxUploadSize,
+		AllowedMIMEs:  cfg.MinIO.AllowedMIMEs,
+	}, log)
+
+	// 传输层
+	groupHandler := handler.NewGroupHandler(groupSvc, log)
+	uploadHandler := handler.NewUploadHandler(uploadSvc, log)
+	shareHandler := handler.NewShareHandler(shareSvc, log)
+
 	r := gin.New()
 
 	// 探针端点：/healthz, /readyz, /metrics（注册在业务中间件之前）
@@ -89,7 +119,7 @@ func buildRouter(cfg *config.Config, entClient *ent.Client, redisClient *redis.C
 		probe.WithRedis(redisClient),
 	)
 
-	httprouter.SetupRouter(r, snippetHandler, log)
+	httprouter.SetupRouter(r, uploadHandler, shareHandler, groupHandler, log)
 
 	return r
 }

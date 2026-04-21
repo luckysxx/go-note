@@ -35,10 +35,14 @@ type Snippet struct {
 	MimeType string `json:"mime_type,omitempty"`
 	// 编程语言或文件类型标识
 	Language string `json:"language,omitempty"`
-	// 可见性：public=公开 private=私有
-	Visibility snippet.Visibility `json:"visibility,omitempty"`
 	// 所属分组 ID
 	GroupID *int64 `json:"group_id,omitempty"`
+	// 在所属分组内的排序权重，值越小越靠前，支持拖拽排序
+	SortOrder int `json:"sort_order,omitempty"`
+	// 是否已收藏
+	IsFavorite bool `json:"is_favorite,omitempty"`
+	// 删除时间，有值表示已进入回收站（软删除）
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
 	// 创建时间
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// 最后更新时间
@@ -55,9 +59,11 @@ type SnippetEdges struct {
 	Group *Group `json:"group,omitempty"`
 	// Tags holds the value of the tags edge.
 	Tags []*Tag `json:"tags,omitempty"`
+	// Shares holds the value of the shares edge.
+	Shares []*Share `json:"shares,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [2]bool
+	loadedTypes [3]bool
 }
 
 // GroupOrErr returns the Group value or an error if the edge
@@ -80,16 +86,27 @@ func (e SnippetEdges) TagsOrErr() ([]*Tag, error) {
 	return nil, &NotLoadedError{edge: "tags"}
 }
 
+// SharesOrErr returns the Shares value or an error if the edge
+// was not loaded in eager-loading.
+func (e SnippetEdges) SharesOrErr() ([]*Share, error) {
+	if e.loadedTypes[2] {
+		return e.Shares, nil
+	}
+	return nil, &NotLoadedError{edge: "shares"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*Snippet) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case snippet.FieldID, snippet.FieldOwnerID, snippet.FieldFileSize, snippet.FieldGroupID:
+		case snippet.FieldIsFavorite:
+			values[i] = new(sql.NullBool)
+		case snippet.FieldID, snippet.FieldOwnerID, snippet.FieldFileSize, snippet.FieldGroupID, snippet.FieldSortOrder:
 			values[i] = new(sql.NullInt64)
-		case snippet.FieldType, snippet.FieldTitle, snippet.FieldContent, snippet.FieldFileURL, snippet.FieldMimeType, snippet.FieldLanguage, snippet.FieldVisibility:
+		case snippet.FieldType, snippet.FieldTitle, snippet.FieldContent, snippet.FieldFileURL, snippet.FieldMimeType, snippet.FieldLanguage:
 			values[i] = new(sql.NullString)
-		case snippet.FieldCreatedAt, snippet.FieldUpdatedAt:
+		case snippet.FieldDeletedAt, snippet.FieldCreatedAt, snippet.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -160,18 +177,31 @@ func (_m *Snippet) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.Language = value.String
 			}
-		case snippet.FieldVisibility:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field visibility", values[i])
-			} else if value.Valid {
-				_m.Visibility = snippet.Visibility(value.String)
-			}
 		case snippet.FieldGroupID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field group_id", values[i])
 			} else if value.Valid {
 				_m.GroupID = new(int64)
 				*_m.GroupID = value.Int64
+			}
+		case snippet.FieldSortOrder:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field sort_order", values[i])
+			} else if value.Valid {
+				_m.SortOrder = int(value.Int64)
+			}
+		case snippet.FieldIsFavorite:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field is_favorite", values[i])
+			} else if value.Valid {
+				_m.IsFavorite = value.Bool
+			}
+		case snippet.FieldDeletedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field deleted_at", values[i])
+			} else if value.Valid {
+				_m.DeletedAt = new(time.Time)
+				*_m.DeletedAt = value.Time
 			}
 		case snippet.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -206,6 +236,11 @@ func (_m *Snippet) QueryGroup() *GroupQuery {
 // QueryTags queries the "tags" edge of the Snippet entity.
 func (_m *Snippet) QueryTags() *TagQuery {
 	return NewSnippetClient(_m.config).QueryTags(_m)
+}
+
+// QueryShares queries the "shares" edge of the Snippet entity.
+func (_m *Snippet) QueryShares() *ShareQuery {
+	return NewSnippetClient(_m.config).QueryShares(_m)
 }
 
 // Update returns a builder for updating this Snippet.
@@ -255,12 +290,20 @@ func (_m *Snippet) String() string {
 	builder.WriteString("language=")
 	builder.WriteString(_m.Language)
 	builder.WriteString(", ")
-	builder.WriteString("visibility=")
-	builder.WriteString(fmt.Sprintf("%v", _m.Visibility))
-	builder.WriteString(", ")
 	if v := _m.GroupID; v != nil {
 		builder.WriteString("group_id=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("sort_order=")
+	builder.WriteString(fmt.Sprintf("%v", _m.SortOrder))
+	builder.WriteString(", ")
+	builder.WriteString("is_favorite=")
+	builder.WriteString(fmt.Sprintf("%v", _m.IsFavorite))
+	builder.WriteString(", ")
+	if v := _m.DeletedAt; v != nil {
+		builder.WriteString("deleted_at=")
+		builder.WriteString(v.Format(time.ANSIC))
 	}
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")

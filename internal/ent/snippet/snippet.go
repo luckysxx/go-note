@@ -31,10 +31,14 @@ const (
 	FieldMimeType = "mime_type"
 	// FieldLanguage holds the string denoting the language field in the database.
 	FieldLanguage = "language"
-	// FieldVisibility holds the string denoting the visibility field in the database.
-	FieldVisibility = "visibility"
 	// FieldGroupID holds the string denoting the group_id field in the database.
 	FieldGroupID = "group_id"
+	// FieldSortOrder holds the string denoting the sort_order field in the database.
+	FieldSortOrder = "sort_order"
+	// FieldIsFavorite holds the string denoting the is_favorite field in the database.
+	FieldIsFavorite = "is_favorite"
+	// FieldDeletedAt holds the string denoting the deleted_at field in the database.
+	FieldDeletedAt = "deleted_at"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -43,6 +47,8 @@ const (
 	EdgeGroup = "group"
 	// EdgeTags holds the string denoting the tags edge name in mutations.
 	EdgeTags = "tags"
+	// EdgeShares holds the string denoting the shares edge name in mutations.
+	EdgeShares = "shares"
 	// Table holds the table name of the snippet in the database.
 	Table = "snippets"
 	// GroupTable is the table that holds the group relation/edge.
@@ -57,6 +63,13 @@ const (
 	// TagsInverseTable is the table name for the Tag entity.
 	// It exists in this package in order to avoid circular dependency with the "tag" package.
 	TagsInverseTable = "tags"
+	// SharesTable is the table that holds the shares relation/edge.
+	SharesTable = "shares"
+	// SharesInverseTable is the table name for the Share entity.
+	// It exists in this package in order to avoid circular dependency with the "share" package.
+	SharesInverseTable = "shares"
+	// SharesColumn is the table column denoting the shares relation/edge.
+	SharesColumn = "snippet_id"
 )
 
 // Columns holds all SQL columns for snippet fields.
@@ -70,8 +83,10 @@ var Columns = []string{
 	FieldFileSize,
 	FieldMimeType,
 	FieldLanguage,
-	FieldVisibility,
 	FieldGroupID,
+	FieldSortOrder,
+	FieldIsFavorite,
+	FieldDeletedAt,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -107,6 +122,10 @@ var (
 	DefaultLanguage string
 	// LanguageValidator is a validator for the "language" field. It is called by the builders before save.
 	LanguageValidator func(string) error
+	// DefaultSortOrder holds the default value on creation for the "sort_order" field.
+	DefaultSortOrder int
+	// DefaultIsFavorite holds the default value on creation for the "is_favorite" field.
+	DefaultIsFavorite bool
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
@@ -139,32 +158,6 @@ func TypeValidator(_type Type) error {
 		return nil
 	default:
 		return fmt.Errorf("snippet: invalid enum value for type field: %q", _type)
-	}
-}
-
-// Visibility defines the type for the "visibility" enum field.
-type Visibility string
-
-// VisibilityPrivate is the default value of the Visibility enum.
-const DefaultVisibility = VisibilityPrivate
-
-// Visibility values.
-const (
-	VisibilityPublic  Visibility = "public"
-	VisibilityPrivate Visibility = "private"
-)
-
-func (v Visibility) String() string {
-	return string(v)
-}
-
-// VisibilityValidator is a validator for the "visibility" field enum values. It is called by the builders before save.
-func VisibilityValidator(v Visibility) error {
-	switch v {
-	case VisibilityPublic, VisibilityPrivate:
-		return nil
-	default:
-		return fmt.Errorf("snippet: invalid enum value for visibility field: %q", v)
 	}
 }
 
@@ -216,14 +209,24 @@ func ByLanguage(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldLanguage, opts...).ToFunc()
 }
 
-// ByVisibility orders the results by the visibility field.
-func ByVisibility(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldVisibility, opts...).ToFunc()
-}
-
 // ByGroupID orders the results by the group_id field.
 func ByGroupID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldGroupID, opts...).ToFunc()
+}
+
+// BySortOrder orders the results by the sort_order field.
+func BySortOrder(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSortOrder, opts...).ToFunc()
+}
+
+// ByIsFavorite orders the results by the is_favorite field.
+func ByIsFavorite(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldIsFavorite, opts...).ToFunc()
+}
+
+// ByDeletedAt orders the results by the deleted_at field.
+func ByDeletedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDeletedAt, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.
@@ -256,6 +259,20 @@ func ByTags(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newTagsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// BySharesCount orders the results by shares count.
+func BySharesCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newSharesStep(), opts...)
+	}
+}
+
+// ByShares orders the results by shares terms.
+func ByShares(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newSharesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newGroupStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -268,5 +285,12 @@ func newTagsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(TagsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2M, false, TagsTable, TagsPrimaryKey...),
+	)
+}
+func newSharesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(SharesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, SharesTable, SharesColumn),
 	)
 }
